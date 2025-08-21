@@ -1,6 +1,5 @@
 <?php
 date_default_timezone_set('Asia/Jakarta');
-// Aktifkan error reporting untuk debug
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -24,17 +23,27 @@ if ($conn->connect_error) {
     exit;
 }
 
-// Ambil data user, tambahkan id_users
-$stmt = $conn->prepare("SELECT id_users, password_hash, role FROM users WHERE username = ?");
+// Ambil data user, tambahkan step1, step2, step3 jika seller
+$stmt = $conn->prepare("SELECT id_users, password_hash, role, step1, step2, step3 FROM users WHERE username = ?");
 $stmt->bind_param("s", $username);
 $stmt->execute();
 $stmt->store_result();
 
 if ($stmt->num_rows > 0) {
-    $stmt->bind_result($id_users, $hashed_password, $role);
+    $stmt->bind_result($id_users, $hashed_password, $role, $step1, $step2, $step3);
     $stmt->fetch();
     if (password_verify($password, $hashed_password)) {
-        echo json_encode(['success' => true, 'id_users' => $id_users, 'role' => $role]);
+        $response = [
+            'success' => true,
+            'id_users' => $id_users,
+            'role' => $role
+        ];
+        if ($role === 'penjual') {
+            $response['step1'] = (bool)$step1;
+            $response['step2'] = (bool)$step2;
+            $response['step3'] = (bool)$step3;
+        }
+        echo json_encode($response);
     } else {
         echo json_encode(['success' => false, 'message' => 'Password salah']);
     }
