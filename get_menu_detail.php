@@ -1,99 +1,115 @@
 <?php
-header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
+include 'db.php';
 
-$response = ['success' => false, 'data' => null, 'message' => ''];
+header('Content-Type: application/json');
 
-$mysqli = @new mysqli('localhost', 'root', '', 'dpr_bites');
-if ($mysqli->connect_errno) {
-    $response['message'] = 'DB connection failed';
-    echo json_encode($response); exit;
-}
-$mysqli->set_charset('utf8mb4');
-
-$id = isset($_GET['id']) ? trim($_GET['id']) : '';
-if ($id === '') {
-    $response['message'] = 'Missing id';
-    echo json_encode($response); exit;
-}
-
-// Detect optional columns
-$menuColumns = [];
-if ($resCols = $mysqli->query("SHOW COLUMNS FROM menu")) {
-    while ($r = $resCols->fetch_assoc()) { $menuColumns[$r['Field']] = true; }
-    $resCols->free();
-}
-$addonColumns = [];
-if ($resACols = $mysqli->query("SHOW COLUMNS FROM addon")) {
-    while ($r = $resACols->fetch_assoc()) { $addonColumns[$r['Field']] = true; }
-    $resACols->free();
-}
-
-// Build SELECT with correct PK id_menu
-$selectMenu = [];
-$selectMenu[] = 'm.id_menu AS id';
-$selectMenu[] = ($menuColumns['nama_menu'] ?? false) ? 'm.nama_menu' : "'' AS nama_menu";
-$selectMenu[] = ($menuColumns['deskripsi_menu'] ?? false) ? 'm.deskripsi_menu' : "'' AS deskripsi_menu";
-$selectMenu[] = ($menuColumns['harga'] ?? false) ? 'm.harga' : '0 AS harga';
-$selectMenu[] = ($menuColumns['gambar_menu'] ?? false) ? 'm.gambar_menu' : "'' AS gambar_menu";
-
-$sql = 'SELECT '.implode(',', $selectMenu).' FROM menu m WHERE m.id_menu = ? LIMIT 1';
-$stmt = $mysqli->prepare($sql);
-if (!$stmt) {
-    $response['message'] = 'Prepare failed';
-    echo json_encode($response); exit;
-}
-$stmt->bind_param('s', $id);
-$stmt->execute();
-$menuRes = $stmt->get_result();
-if (!$menuRes || $menuRes->num_rows === 0) {
-    $response['message'] = 'Menu not found';
-    echo json_encode($response); exit;
-}
-$menuRow = $menuRes->fetch_assoc();
-$stmt->close();
-
-// Fetch addons for this menu, assume relation table menu_addon(menu_id, addon_id) or addon has menu_id
-// We'll check both possibilities dynamically.
-// Fetch addons via pivot menu_addon (schema: menu_addon.id_menu, menu_addon.id_addon)
-$addons = [];
-if ($checkMAT = $mysqli->query("SHOW TABLES LIKE 'menu_addon'")) {
-    if ($checkMAT->num_rows > 0) {
-        $addonSelect = [];
-        $addonSelect[] = 'a.id_addon AS id';
-        $addonSelect[] = ($addonColumns['nama_addon'] ?? false) ? 'a.nama_addon' : "'' AS nama_addon";
-        $addonSelect[] = ($addonColumns['harga'] ?? false) ? 'a.harga' : '0 AS harga';
-        $addonSelect[] = ($addonColumns['image_path'] ?? false) ? 'a.image_path' : "'' AS image_path";
-        $sqlAddon = 'SELECT '.implode(',', $addonSelect).' FROM addon a JOIN menu_addon ma ON ma.id_addon = a.id_addon WHERE ma.id_menu = ?';
-        if ($stA = $mysqli->prepare($sqlAddon)) {
-            $stA->bind_param('s', $id);
-            $stA->execute();
-            if ($resA = $stA->get_result()) {
-                while ($rowA = $resA->fetch_assoc()) {
-                    $addons[] = [
-                        'id' => $rowA['id'],
-                        'label' => $rowA['nama_addon'] ?? '',
-                        'price' => (int)($rowA['harga'] ?? 0),
-                        'image' => $rowA['image_path'] ?? ''
-                    ];
-                }
-            }
-            $stA->close();
+if (isset($_POST['update_tersedia'])) {
+    // Update tersedia untuk menu atau addon
+    $tersedia = isset($_POST['tersedia']) ? intval($_POST['tersedia']) : 0;
+    if (isset($_POST['id_menu'])) {
+        $id_menu = intval($_POST['id_menu']);
+        $sql = "UPDATE menu SET tersedia = $tersedia WHERE id_menu = $id_menu";
+        $result = mysqli_query($conn, $sql);
+        if ($result) {
+            echo json_encode(['success' => true, 'message' => 'Status menu diupdate']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Gagal update menu']);
         }
+        exit;
+    } else if (isset($_POST['id_addon'])) {
+        $id_addon = intval($_POST['id_addon']);
+        $sql = "UPDATE addon SET tersedia = $tersedia WHERE id_addon = $id_addon";
+        $result = mysqli_query($conn, $sql);
+        if ($result) {
+            echo json_encode(['success' => true, 'message' => 'Status addon diupdate']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Gagal update addon']);
+        }
+        exit;
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Parameter tidak lengkap']);
+        exit;
     }
-    $checkMAT->free();
 }
 
-$menuData = [
-    'id' => $menuRow['id'],
-    'nama_menu' => $menuRow['nama_menu'] ?? '',
-    'deskripsi_menu' => $menuRow['deskripsi_menu'] ?? '',
-    'harga' => (int)($menuRow['harga'] ?? 0),
-    'gambar_menu' => $menuRow['gambar_menu'] ?? '',
-    'addonOptions' => $addons,
-];
+$id_gerai = isset($_POST['id_gerai']) ? $_POST['id_gerai'] : null;
+$filter = isset($_POST['filter']) ? $_POST['filter'] : 'all';
+$data = [];
 
-$response['success'] = true;
-$response['data'] = $menuData;
+if ($id_gerai) {
+    if ($filter === 'utama') {
+        // Hanya menu utama
+        $query = "SELECT *, 0 as is_addon FROM menu WHERE id_gerai = ?";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("i", $id_gerai);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            // Etalase (detail)
+            $etalase = [];
+            $qe = mysqli_query($conn, "SELECT e.* FROM menu me JOIN etalase e ON me.id_etalase = e.id_etalase WHERE me.id_menu = '{$row['id_menu']}'");
+            while ($re = mysqli_fetch_assoc($qe)) {
+                $etalase[] = $re;
+            }
+            $row['etalase'] = $etalase;
+            // Add-on (detail)
+            $addons = [];
+            $qa = mysqli_query($conn, "SELECT a.* FROM menu_addon ma JOIN addon a ON ma.id_addon = a.id_addon WHERE ma.id_menu = '{$row['id_menu']}'");
+            while ($ra = mysqli_fetch_assoc($qa)) {
+                $addons[] = $ra;
+            }
+            $row['add_ons'] = $addons;
+            $data[] = $row;
+        }
+        $stmt->close();
+    } else if ($filter === 'addon') {
+        // Hanya add-on
+        $query = "SELECT *, 1 as is_addon FROM addon WHERE id_gerai = ?";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("i", $id_gerai);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $data[] = $row;
+        }
+        $stmt->close();
+    } else {
+        // All: menu utama + add-on
+        $query = "SELECT *, 0 as is_addon FROM menu WHERE id_gerai = ?";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("i", $id_gerai);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            // Etalase (detail)
+            $etalase = [];
+            $qe = mysqli_query($conn, "SELECT e.* FROM menu me JOIN etalase e ON me.id_etalase = e.id_etalase WHERE me.id_menu = '{$row['id_menu']}'");
+            while ($re = mysqli_fetch_assoc($qe)) {
+                $etalase[] = $re;
+            }
+            $row['etalase'] = $etalase;
+            // Add-on (detail)
+            $addons = [];
+            $qa = mysqli_query($conn, "SELECT a.* FROM menu_addon ma JOIN addon a ON ma.id_addon = a.id_addon WHERE ma.id_menu = '{$row['id_menu']}'");
+            while ($ra = mysqli_fetch_assoc($qa)) {
+                $addons[] = $ra;
+            }
+            $row['add_ons'] = $addons;
+            $data[] = $row;
+        }
+        $stmt->close();
+        // Ambil semua add-on
+        $query = "SELECT *, 1 as is_addon FROM addon WHERE id_gerai = ?";
+        $stmt = $conn->prepare($query);
+        $stmt->bind_param("i", $id_gerai);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        while ($row = $result->fetch_assoc()) {
+            $data[] = $row;
+        }
+        $stmt->close();
+    }
+}
 
-echo json_encode($response);
+echo json_encode(['success' => true, 'data' => $data]);
+?>
