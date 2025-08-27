@@ -14,11 +14,15 @@ $no_hp = $data->no_hp;
 $password_hash = password_hash($data->password, PASSWORD_DEFAULT);
 $role = $data->role;
 
-$stmt = $conn->prepare("INSERT INTO users (nama_lengkap, username, email, no_hp, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)");
-$stmt->bind_param("ssssss", $nama_lengkap, $username, $email, $no_hp, $password_hash, $role);
+// Default photo path jika belum ada upload
+$default_photo = 'https://res.cloudinary.com/dip8i3f6x/image/upload/v1756293044/dummy-profile-pic-300x300_udkg39.png';
+
+// Tambahkan kolom photo_path pada insert
+$stmt = $conn->prepare("INSERT INTO users (nama_lengkap, username, email, no_hp, password_hash, role, photo_path) VALUES (?, ?, ?, ?, ?, ?, ?)");
+$stmt->bind_param("sssssss", $nama_lengkap, $username, $email, $no_hp, $password_hash, $role, $default_photo);
 
 if ($stmt->execute()) {
-    echo json_encode(["success" => true]);
+    echo json_encode(["success" => true, "photo_path" => $default_photo]);
 } else {
     echo json_encode(["success" => false, "error" => $conn->error]);
 }
