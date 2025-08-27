@@ -18,6 +18,10 @@ if (!is_array($payload)) $payload = $_POST;
 $userId  = isset($payload['user_id']) ? (int)$payload['user_id'] : 0;
 $geraiId = isset($payload['gerai_id']) ? (int)$payload['gerai_id'] : 0;
 $menuId  = isset($payload['menu_id']) ? (int)$payload['menu_id'] : 0;
+// Optional explicit row targeting (variant editing)
+$itemIdParam = isset($payload['item_id']) ? (int)$payload['item_id'] : 0;
+// Force create a new variant even if same menu exists
+$forceNew = !empty($payload['force_new']);
 $qtyProvided = array_key_exists('qty',$payload);
 $qty     = $qtyProvided ? (int)$payload['qty'] : null; // null means auto for new insert
 $addons  = isset($payload['addons']) && is_array($payload['addons']) ? array_map('intval',$payload['addons']) : [];
@@ -77,18 +81,44 @@ try {
         $cartId = $stmt->insert_id; $stmt->close();
     }
 
-    // Check existing item (single variant only for now: first match). If you want per-addon variant rows, adjust query logic.
-    $itemId = null; $oldQty = 0; $existingAddonIds=[];
-    $stmt = $mysqli->prepare("SELECT id_keranjang_item,qty,note FROM keranjang_item WHERE id_keranjang=? AND id_menu=? LIMIT 1");
-    $stmt->bind_param('ii',$cartId,$menuId);
-    $stmt->execute(); $ri=$stmt->get_result();
-    if ($ri && $ri->num_rows>0) { $rowi=$ri->fetch_assoc(); $itemId=(int)$rowi['id_keranjang_item']; $oldQty=(int)$rowi['qty']; }
-    $stmt->close();
-    if ($itemId!==null) {
-        $ga=$mysqli->prepare("SELECT id_addon FROM keranjang_item_addon WHERE id_keranjang_item=?");
-        $ga->bind_param('i',$itemId); $ga->execute(); $ra=$ga->get_result();
-        while ($ra && $ar=$ra->fetch_assoc()) { $existingAddonIds[]=(int)$ar['id_addon']; }
-        $ga->close();
+    // Variant-aware resolution
+    $itemId = null; $oldQty = 0; $existingAddonIds=[]; $existingNote=null;
+    if ($itemIdParam>0) {
+        // Explicit target
+        $chk = $mysqli->prepare("SELECT id_keranjang_item,qty,note FROM keranjang_item WHERE id_keranjang=? AND id_menu=? AND id_keranjang_item=? LIMIT 1");
+        $chk->bind_param('iii',$cartId,$menuId,$itemIdParam);
+        $chk->execute(); $rc=$chk->get_result();
+        if ($rc && $rc->num_rows>0) { $rowc=$rc->fetch_assoc(); $itemId=(int)$rowc['id_keranjang_item']; $oldQty=(int)$rowc['qty']; $existingNote=$rowc['note']; }
+        $chk->close();
+        if ($itemId!==null) {
+            $ga=$mysqli->prepare("SELECT id_addon FROM keranjang_item_addon WHERE id_keranjang_item=?");
+            $ga->bind_param('i',$itemId); $ga->execute(); $ra=$ga->get_result();
+            while ($ra && $ar=$ra->fetch_assoc()) { $existingAddonIds[]=(int)$ar['id_addon']; }
+            $ga->close();
+        }
+    } elseif (!$forceNew) {
+        // Fetch all existing variants for this menu and attempt to match by addons + (optional) note
+        $all = $mysqli->prepare("SELECT id_keranjang_item,qty,note FROM keranjang_item WHERE id_keranjang=? AND id_menu=?");
+        $all->bind_param('ii',$cartId,$menuId); $all->execute(); $raAll=$all->get_result();
+        $candidateRows=[];
+        while ($raAll && $rw=$raAll->fetch_assoc()) { $candidateRows[]=$rw; }
+        $all->close();
+        // Build requested addons set (for comparison)
+        $requestedAddons = $addons; // already filtered
+        sort($requestedAddons);
+        foreach ($candidateRows as $cr) {
+            $cid=(int)$cr['id_keranjang_item']; $cqty=(int)$cr['qty']; $cnote=$cr['note'];
+            $ga=$mysqli->prepare("SELECT id_addon FROM keranjang_item_addon WHERE id_keranjang_item=? ORDER BY id_addon ASC");
+            $ga->bind_param('i',$cid); $ga->execute(); $rad=$ga->get_result();
+            $cAddons=[]; while ($rad && $ar=$rad->fetch_assoc()) { $cAddons[]=(int)$ar['id_addon']; }
+            $ga->close(); sort($cAddons);
+            $addonsMatch = ($requestedAddons === $cAddons);
+            $noteMatch = !$noteProvided || ($noteProvided && $note === null && $cnote===null) || ($noteProvided && $note !== null && $note === $cnote);
+            if ($addonsMatch && $noteMatch) {
+                $itemId=$cid; $oldQty=$cqty; $existingAddonIds=$cAddons; $existingNote=$cnote; break;
+            }
+        }
+        // If not matched, we'll insert new variant later (itemId stays null)
     }
 
     // Determine target qty
@@ -133,7 +163,7 @@ try {
         }
         $unitPrice = $basePrice + $addonUnitAdd; // harga per item termasuk addon
         $subtotal = $unitPrice * $qty;
-        if ($itemId===null) {
+    if ($itemId===null) {
             // Insert new with note (column 'note' must exist in keranjang_item)
             $ins = $mysqli->prepare("INSERT INTO keranjang_item (id_keranjang,id_menu,qty,harga_satuan,subtotal,note) VALUES (?,?,?,?,?,?)");
             $noteForInsert = $noteProvided ? $note : null; // if not provided keep NULL
