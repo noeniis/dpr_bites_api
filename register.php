@@ -12,7 +12,13 @@ $username = $data->username;
 $email = $data->email;
 $no_hp = $data->no_hp;
 $password_hash = password_hash($data->password, PASSWORD_DEFAULT);
-$role = $data->role;
+
+// Pastikan role hanya '0', '1', atau '2' (string, sesuai enum)
+$role = isset($data->role) ? (string)$data->role : '0';
+if (!in_array($role, ['0','1','2'])) {
+    echo json_encode(["success" => false, "error" => "Role tidak valid, harus 0, 1, atau 2"]);
+    exit;
+}
 
 // Default photo path jika belum ada upload
 $default_photo = 'https://res.cloudinary.com/dip8i3f6x/image/upload/v1756293044/dummy-profile-pic-300x300_udkg39.png';

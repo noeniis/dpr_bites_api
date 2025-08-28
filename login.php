@@ -23,7 +23,7 @@ if ($conn->connect_error) {
     exit;
 }
 
-// Ambil data user, tambahkan step1, step2, step3 jika seller
+// Ambil data user, role sekarang enum '0','1','2'
 $stmt = $conn->prepare("SELECT id_users, password_hash, role, step1, step2, step3 FROM users WHERE username = ?");
 $stmt->bind_param("s", $username);
 $stmt->execute();
@@ -33,12 +33,13 @@ if ($stmt->num_rows > 0) {
     $stmt->bind_result($id_users, $hashed_password, $role, $step1, $step2, $step3);
     $stmt->fetch();
     if (password_verify($password, $hashed_password)) {
+        $roleInt = (int)$role; // enum value '0','1','2' as int
         $response = [
             'success' => true,
             'id_users' => $id_users,
-            'role' => $role
+            'role' => $roleInt
         ];
-        if ($role === 'penjual') {
+        if ($roleInt === 1) { // 1 = penjual
             $response['step1'] = (bool)$step1;
             $response['step2'] = (bool)$step2;
             $response['step3'] = (bool)$step3;
