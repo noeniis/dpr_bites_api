@@ -22,11 +22,12 @@ if ($tanggal !== '') {
   }
 }
 
-$sql = "SELECT t.id_transaksi, t.booking_id, t.status, t.id_users, u.nama_lengkap, t.bukti_pembayaran
-        FROM transaksi t
-        JOIN users u ON t.id_users = u.id_users
-        WHERE t.id_gerai = ? $whereTanggal
-        ORDER BY t.id_transaksi DESC";
+
+$sql = "SELECT t.id_transaksi, t.booking_id, t.status, t.id_users, u.nama_lengkap, t.bukti_pembayaran, t.metode_pembayaran
+  FROM transaksi t
+  JOIN users u ON t.id_users = u.id_users
+  WHERE t.id_gerai = ? $whereTanggal
+  ORDER BY t.id_transaksi DESC";
 
 $stmt = $conn->prepare($sql);
 if (count($params) === 2) {
@@ -42,6 +43,9 @@ $pesanan = [];
 while ($row = $result->fetch_assoc()) {
   if (!isset($row['bukti_pembayaran']) || $row['bukti_pembayaran'] === null) {
     $row['bukti_pembayaran'] = '';
+  }
+  if (!isset($row['metode_pembayaran']) || $row['metode_pembayaran'] === null) {
+    $row['metode_pembayaran'] = '';
   }
   $pesanan[] = $row;
 }
