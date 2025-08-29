@@ -6,7 +6,8 @@ header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
-$mysqli = @new mysqli('localhost', 'root', '', 'dpr_bites');
+$host = 'localhost'; $user = 'root'; $pass = ''; $db = 'dpr_bites'; $port = 3306;
+$mysqli = @new mysqli($host, $user, $pass, $db, $port);
 if ($mysqli->connect_errno) {
     echo json_encode([
         'success' => false,
@@ -58,7 +59,8 @@ $status = 'konfirmasi_ketersediaan';
 // Upload ke Cloudinary (unsigned) -> simpan secure_url
 $cloudName = 'dip8i3f6x';
 $uploadPreset = 'dpr_bites'; // unsigned preset
-$buktiFilePath = '';
+$buktiFilePath = ''; // Awal transaksi: belum ada bukti pembayaran (user belum bayar / masih cek ketersediaan)
+// Simpan kosong; upload akan dilakukan setelah dialog pembayaran (QRIS) / konfirmasi seller (cash)
 if ($buktiBase64) {
     if (preg_match('/^data:(image\/(png|jpe?g));base64,(.+)$/i', $buktiBase64, $m)) {
         $b64 = $m[3];
@@ -90,10 +92,7 @@ if ($buktiBase64) {
         }
     }
 }
-if ($buktiFilePath === '') {
-    // fallback placeholder url (bisa ganti ke asset Cloudinary default)
-    $buktiFilePath = 'https://res.cloudinary.com/dip8i3f6x/image/upload/v1756176430/qris-default_lr9x0g.jpg';
-}
+// Biarkan kosong ("") jika belum ada bukti transaksi
 
 $mysqli->begin_transaction();
 try {
