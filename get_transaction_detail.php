@@ -44,16 +44,18 @@ $resI = $mysqli->query("SELECT ti.id_transaksi_item,ti.id_menu,m.nama_menu,ti.ju
 if($resI){
   while($rowI=$resI->fetch_assoc()){
     $tid = (int)$rowI['id_transaksi_item'];
-    $addons=[]; $addonsDetail=[];
-    $resAd=$mysqli->query('SELECT tia.id_addon,a.nama_addon FROM transaksi_item_addon tia JOIN addon a ON a.id_addon=tia.id_addon WHERE tia.id_transaksi_item='.$tid);
-    if($resAd){
-      while($rA=$resAd->fetch_assoc()){
-        $idA = (int)$rA['id_addon'];
-        $addons[] = $idA; // list id (legacy)
-        $addonsDetail[] = ['id_addon'=>$idA,'nama_addon'=>$rA['nama_addon']];
-      }
-      $resAd->free();
-    }
+$addons = [];
+$resAd = $mysqli->query('SELECT a.id_addon, a.nama_addon, a.harga FROM transaksi_item_addon tia JOIN addon a ON a.id_addon = tia.id_addon WHERE tia.id_transaksi_item='.$tid);
+if($resAd){
+  while($rA = $resAd->fetch_assoc()){
+    $addons[] = [
+      'id_addon' => (int)$rA['id_addon'],
+      'nama_addon' => $rA['nama_addon'],
+      'harga' => (int)$rA['harga'],
+    ];
+  }
+  $resAd->free();
+}
     $items[] = [
       'id_menu'=>(int)$rowI['id_menu'],
       'name'=>$rowI['nama_menu'],
