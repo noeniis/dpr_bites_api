@@ -18,7 +18,7 @@ if($bookingId==='' && $idTransaksi<=0){
 }
 
 $where = $bookingId!=='' ? "t.booking_id='".$mysqli->real_escape_string($bookingId)."'" : 't.id_transaksi='.$idTransaksi;
-$sql = "SELECT t.id_transaksi,t.booking_id,t.STATUS,t.jenis_pengantaran,t.id_users,t.id_gerai,t.metode_pembayaran,t.bukti_pembayaran,t.catatan_pembatalan,g.nama_gerai,g.detail_alamat,g.qris_path FROM transaksi t JOIN gerai g ON g.id_gerai=t.id_gerai WHERE $where LIMIT 1";
+$sql = "SELECT t.id_transaksi,t.booking_id,t.STATUS,t.jenis_pengantaran,t.id_users,t.id_gerai,t.id_alamat,t.metode_pembayaran,t.bukti_pembayaran,t.catatan_pembatalan,g.nama_gerai,g.detail_alamat,g.qris_path FROM transaksi t JOIN gerai g ON g.id_gerai=t.id_gerai WHERE $where LIMIT 1";
 $res = $mysqli->query($sql);
 if(!$res || $res->num_rows===0){echo json_encode(['success'=>false,'message'=>'Transaksi tidak ditemukan']);exit;}
 $tx = $res->fetch_assoc();
@@ -28,8 +28,14 @@ $idT = intval($tx['id_transaksi']);
 // Ambil alamat utama user jika pengantaran
 $locationBuyer = '';
 if($tx['jenis_pengantaran']==='pengantaran'){
-  $resA = $mysqli->query('SELECT nama_gedung, detail_pengantaran FROM alamat_pengantaran WHERE id_users='.(int)$tx['id_users'].' AND alamat_utama=1 LIMIT 1');
-  if($resA && $resA->num_rows>0){ $rowA=$resA->fetch_assoc(); $locationBuyer = $rowA['detail_pengantaran']; $buildingNameBuyer = $rowA['nama_gedung']; $resA->free(); }
+  if(!empty($tx['id_alamat'])){
+    $resA = $mysqli->query('SELECT nama_gedung, detail_pengantaran FROM alamat_pengantaran WHERE id_alamat='.(int)$tx['id_alamat'].' LIMIT 1');
+    if($resA && $resA->num_rows>0){ $rowA=$resA->fetch_assoc(); $locationBuyer = $rowA['detail_pengantaran']; $buildingNameBuyer = $rowA['nama_gedung']; $resA->free(); }
+  }
+  if($locationBuyer===''){
+    $resA = $mysqli->query('SELECT nama_gedung, detail_pengantaran FROM alamat_pengantaran WHERE id_users='.(int)$tx['id_users'].' AND alamat_utama=1 LIMIT 1');
+    if($resA && $resA->num_rows>0){ $rowA=$resA->fetch_assoc(); $locationBuyer = $rowA['detail_pengantaran']; $buildingNameBuyer = $rowA['nama_gedung']; $resA->free(); }
+  }
 }
 
 // Items
@@ -38,8 +44,16 @@ $resI = $mysqli->query("SELECT ti.id_transaksi_item,ti.id_menu,m.nama_menu,ti.ju
 if($resI){
   while($rowI=$resI->fetch_assoc()){
     $tid = (int)$rowI['id_transaksi_item'];
-    $addons=[]; $resAd=$mysqli->query('SELECT id_addon FROM transaksi_item_addon WHERE id_transaksi_item='.$tid);
-    if($resAd){ while($rA=$resAd->fetch_assoc()){ $addons[] = (int)$rA['id_addon']; } $resAd->free(); }
+    $addons=[]; $addonsDetail=[];
+    $resAd=$mysqli->query('SELECT tia.id_addon,a.nama_addon FROM transaksi_item_addon tia JOIN addon a ON a.id_addon=tia.id_addon WHERE tia.id_transaksi_item='.$tid);
+    if($resAd){
+      while($rA=$resAd->fetch_assoc()){
+        $idA = (int)$rA['id_addon'];
+        $addons[] = $idA; // list id (legacy)
+        $addonsDetail[] = ['id_addon'=>$idA,'nama_addon'=>$rA['nama_addon']];
+      }
+      $resAd->free();
+    }
     $items[] = [
       'id_menu'=>(int)$rowI['id_menu'],
       'name'=>$rowI['nama_menu'],
@@ -47,7 +61,8 @@ if($resI){
       'harga_satuan'=>(int)$rowI['harga_satuan'],
       'subtotal'=>(int)$rowI['subtotal'],
       'note'=>$rowI['note'],
-      'addons'=>$addons,
+      'addons'=>$addons, // list id
+      'addons_detail'=>$addonsDetail, // list objek {id_addon,nama_addon}
     ];
   }
   $resI->free();
@@ -56,8 +71,10 @@ if($resI){
 echo json_encode(['success'=>true,'data'=>[
   'id_transaksi'=>$idT,
   'booking_id'=>$tx['booking_id'],
+  'id_gerai'=>(int)$tx['id_gerai'],
   'status'=>$tx['STATUS'],
   'jenis_pengantaran'=>$tx['jenis_pengantaran'],
+  'id_alamat'=>isset($tx['id_alamat']) ? (int)$tx['id_alamat'] : null,
   'restaurantName'=>$tx['nama_gerai'],
   'metode_pembayaran'=>$tx['metode_pembayaran'],
   'bukti_pembayaran'=>$tx['bukti_pembayaran'],
