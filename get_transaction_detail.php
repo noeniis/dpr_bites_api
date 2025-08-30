@@ -23,19 +23,30 @@ $res = $mysqli->query($sql);
 if(!$res || $res->num_rows===0){echo json_encode(['success'=>false,'message'=>'Transaksi tidak ditemukan']);exit;}
 $tx = $res->fetch_assoc();
 $res->free();
+
 $idT = intval($tx['id_transaksi']);
+$idAlamat = isset($tx['id_alamat']) ? intval($tx['id_alamat']) : 0;
+
+// Ambil detail alamat, lat, long jika ada id_alamat
+$alamatDetail = '';
+$alamatLat = null;
+$alamatLng = null;
+if ($idAlamat > 0) {
+  $resAlamat = $mysqli->query("SELECT detail_pengantaran, latitude, longitude FROM alamat_pengantaran WHERE id_alamat = $idAlamat LIMIT 1");
+  if ($resAlamat && $resAlamat->num_rows > 0) {
+    $rowAlamat = $resAlamat->fetch_assoc();
+    $alamatDetail = $rowAlamat['detail_pengantaran'];
+    $alamatLat = $rowAlamat['latitude'];
+    $alamatLng = $rowAlamat['longitude'];
+    $resAlamat->free();
+  }
+}
 
 // Ambil alamat utama user jika pengantaran
 $locationBuyer = '';
 if($tx['jenis_pengantaran']==='pengantaran'){
-  if(!empty($tx['id_alamat'])){
-    $resA = $mysqli->query('SELECT nama_gedung, detail_pengantaran FROM alamat_pengantaran WHERE id_alamat='.(int)$tx['id_alamat'].' LIMIT 1');
-    if($resA && $resA->num_rows>0){ $rowA=$resA->fetch_assoc(); $locationBuyer = $rowA['detail_pengantaran']; $buildingNameBuyer = $rowA['nama_gedung']; $resA->free(); }
-  }
-  if($locationBuyer===''){
-    $resA = $mysqli->query('SELECT nama_gedung, detail_pengantaran FROM alamat_pengantaran WHERE id_users='.(int)$tx['id_users'].' AND alamat_utama=1 LIMIT 1');
-    if($resA && $resA->num_rows>0){ $rowA=$resA->fetch_assoc(); $locationBuyer = $rowA['detail_pengantaran']; $buildingNameBuyer = $rowA['nama_gedung']; $resA->free(); }
-  }
+  $resA = $mysqli->query('SELECT nama_gedung, detail_pengantaran FROM alamat_pengantaran WHERE id_users='.(int)$tx['id_users'].' AND alamat_utama=1 LIMIT 1');
+  if($resA && $resA->num_rows>0){ $rowA=$resA->fetch_assoc(); $locationBuyer = $rowA['detail_pengantaran']; $buildingNameBuyer = $rowA['nama_gedung']; $resA->free(); }
 }
 
 // Items
@@ -44,16 +55,18 @@ $resI = $mysqli->query("SELECT ti.id_transaksi_item,ti.id_menu,m.nama_menu,ti.ju
 if($resI){
   while($rowI=$resI->fetch_assoc()){
     $tid = (int)$rowI['id_transaksi_item'];
-    $addons=[]; $addonsDetail=[];
-    $resAd=$mysqli->query('SELECT tia.id_addon,a.nama_addon FROM transaksi_item_addon tia JOIN addon a ON a.id_addon=tia.id_addon WHERE tia.id_transaksi_item='.$tid);
-    if($resAd){
-      while($rA=$resAd->fetch_assoc()){
-        $idA = (int)$rA['id_addon'];
-        $addons[] = $idA; // list id (legacy)
-        $addonsDetail[] = ['id_addon'=>$idA,'nama_addon'=>$rA['nama_addon']];
-      }
-      $resAd->free();
-    }
+$addons = [];
+$resAd = $mysqli->query('SELECT a.id_addon, a.nama_addon, a.harga FROM transaksi_item_addon tia JOIN addon a ON a.id_addon = tia.id_addon WHERE tia.id_transaksi_item='.$tid);
+if($resAd){
+  while($rA = $resAd->fetch_assoc()){
+    $addons[] = [
+      'id_addon' => (int)$rA['id_addon'],
+      'nama_addon' => $rA['nama_addon'],
+      'harga' => (int)$rA['harga'],
+    ];
+  }
+  $resAd->free();
+}
     $items[] = [
       'id_menu'=>(int)$rowI['id_menu'],
       'name'=>$rowI['nama_menu'],
@@ -61,8 +74,7 @@ if($resI){
       'harga_satuan'=>(int)$rowI['harga_satuan'],
       'subtotal'=>(int)$rowI['subtotal'],
       'note'=>$rowI['note'],
-      'addons'=>$addons, // list id
-      'addons_detail'=>$addonsDetail, // list objek {id_addon,nama_addon}
+      'addons'=>$addons,
     ];
   }
   $resI->free();
@@ -71,10 +83,8 @@ if($resI){
 echo json_encode(['success'=>true,'data'=>[
   'id_transaksi'=>$idT,
   'booking_id'=>$tx['booking_id'],
-  'id_gerai'=>(int)$tx['id_gerai'],
   'status'=>$tx['STATUS'],
   'jenis_pengantaran'=>$tx['jenis_pengantaran'],
-  'id_alamat'=>isset($tx['id_alamat']) ? (int)$tx['id_alamat'] : null,
   'restaurantName'=>$tx['nama_gerai'],
   'metode_pembayaran'=>$tx['metode_pembayaran'],
   'bukti_pembayaran'=>$tx['bukti_pembayaran'],
@@ -83,6 +93,12 @@ echo json_encode(['success'=>true,'data'=>[
   'listing_path'=>isset($tx['listing_path'])?$tx['listing_path']:null,
   'locationBuyer'=>$locationBuyer,
   'buildingNameBuyer'=>isset($buildingNameBuyer)?$buildingNameBuyer:'',
+  'alamat_pengantaran'=>[
+    'id_alamat'=>$idAlamat,
+    'detail'=>$alamatDetail,
+    'latitude'=>$alamatLat,
+    'longitude'=>$alamatLng,
+  ],
   'items'=>$items,
   'catatan_pembatalan'=>$tx['catatan_pembatalan'],
 ]]);

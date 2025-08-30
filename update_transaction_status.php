@@ -1,9 +1,5 @@
 <?php
-// Update status transaksi dengan validasi alur & alasan pembatalan otomatis
-// Allowed statuses sequence:
-// konfirmasi_ketersediaan -> konfirmasi_pembayaran -> disiapkan -> (diantar | pickup) -> selesai
-// Pembatalan dapat terjadi dari status apapun sebelum selesai dengan field catatan_pembatalan
-// Request JSON: { "booking_id"|"id_transaksi", "new_status", "alasan"? }
+
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
