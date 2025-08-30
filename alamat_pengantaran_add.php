@@ -12,15 +12,33 @@ if ($conn->connect_error) {
     exit;
 }
 
-// Ambil data dari request
 $data = json_decode(file_get_contents('php://input'), true);
 
-if (!isset($data['id_users'], $data['nama_penerima'], $data['nama_gedung'], $data['detail_pengantaran'], $data['latitude'], $data['longitude'], $data['no_hp'], $data['alamat_utama'])) {
-    echo json_encode(['success' => false, 'message' => 'Parameter tidak lengkap']);
-    exit;
+// Determine requesting user from Authorization Bearer <id> or X-User-Id header, fallback to body
+$req_user = 0;
+$authHeader = '';
+if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+    $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
+} elseif (function_exists('apache_request_headers')) {
+    $h = apache_request_headers();
+    if (isset($h['Authorization'])) $authHeader = $h['Authorization'];
+}
+if ($authHeader) {
+    if (preg_match('/Bearer\s+(\d+)/i', $authHeader, $m)) {
+        $req_user = intval($m[1]);
+    }
+}
+if ($req_user === 0 && isset($_SERVER['HTTP_X_USER_ID'])) {
+    $req_user = intval($_SERVER['HTTP_X_USER_ID']);
 }
 
-$id_users = $data['id_users'];
+if (!isset($data['nama_penerima'], $data['nama_gedung'], $data['detail_pengantaran'], $data['latitude'], $data['longitude'], $data['no_hp'], $data['alamat_utama'])) {
+        echo json_encode(['success' => false, 'message' => 'Parameter tidak lengkap']);
+        exit;
+}
+
+// Use requester identity, ignore any id_users client tried to send
+$id_users = $req_user > 0 ? $req_user : (isset($data['id_users']) ? intval($data['id_users']) : 0);
 $nama_penerima = $data['nama_penerima'];
 $nama_gedung = $data['nama_gedung'];
 $detail_pengantaran = $data['detail_pengantaran'];

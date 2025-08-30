@@ -29,6 +29,7 @@ function respond($ok, $message = '', $data = null, $code = 200) {
     exit;
 }
 
+
 $raw = file_get_contents('php://input');
 $input = [];
 if ($raw) {
@@ -38,6 +39,17 @@ if ($raw) {
 // allow GET fallback
 if (isset($_GET['user_id'])) $input['user_id'] = $_GET['user_id'];
 if (isset($_GET['gerai_id'])) $input['gerai_id'] = $_GET['gerai_id'];
+// Ambil selectedCartItemIds dari input (POST/GET, bisa array atau string koma)
+$selectedCartItemIds = [];
+if (isset($input['selectedCartItemIds'])) {
+    if (is_array($input['selectedCartItemIds'])) {
+        $selectedCartItemIds = array_map('intval', $input['selectedCartItemIds']);
+    } else if (is_string($input['selectedCartItemIds'])) {
+        $selectedCartItemIds = array_map('intval', explode(',', $input['selectedCartItemIds']));
+    }
+} elseif (isset($_GET['selectedCartItemIds'])) {
+    $selectedCartItemIds = array_map('intval', explode(',', $_GET['selectedCartItemIds']));
+}
 
 $userId = isset($input['user_id']) ? (int)$input['user_id'] : 0;
 $geraiId = isset($input['gerai_id']) ? (int)$input['gerai_id'] : 0;
@@ -144,7 +156,19 @@ if ($resAlamat->num_rows > 0) {
 }
 
 // 6. Build response list preserving original array order
-$itemsList = array_values($items);
+
+// Filter items jika ada selectedCartItemIds
+if (!empty($selectedCartItemIds)) {
+    $filtered = [];
+    foreach ($items as $iid => $item) {
+        if (in_array($iid, $selectedCartItemIds)) {
+            $filtered[$iid] = $item;
+        }
+    }
+    $itemsList = array_values($filtered);
+} else {
+    $itemsList = array_values($items);
+}
 
 respond(true, 'OK', [
     'restaurantName' => $geraiName,

@@ -39,18 +39,26 @@ if (isset($_GET['min_rating'])) {
 if ($minRating < 0) $minRating = 0; // sanitasi ringan
 
 // Query utama: agregasi rating & rentang harga
+// Aggregate ratings in a derived subquery to avoid duplicates caused by
+// joining menu rows to the transaksi/ulasan joins.
 $sql = "SELECT g.id_gerai,
                g.nama_gerai,
                COALESCE(gp.listing_path, '') AS listing_path,
                COALESCE(gp.deskripsi_gerai, '') AS deskripsi,
-               ROUND(COALESCE(AVG(u.rating),0),1) AS avg_rating,
-               COUNT(u.id_ulasan) AS rating_count,
+               ROUND(COALESCE(r.avg_rating,0),1) AS avg_rating,
+               COALESCE(r.rating_count,0) AS rating_count,
                MIN(m.harga) AS min_price,
                MAX(m.harga) AS max_price
         FROM gerai g
         LEFT JOIN gerai_profil gp ON gp.id_gerai = g.id_gerai
-        LEFT JOIN transaksi t ON t.id_gerai = g.id_gerai
-        LEFT JOIN ulasan u ON u.id_transaksi = t.id_transaksi
+        LEFT JOIN (
+            SELECT t.id_gerai AS id_gerai,
+                   AVG(u.rating) AS avg_rating,
+                   COUNT(u.id_ulasan) AS rating_count
+            FROM transaksi t
+            JOIN ulasan u ON u.id_transaksi = t.id_transaksi
+            GROUP BY t.id_gerai
+        ) r ON r.id_gerai = g.id_gerai
         LEFT JOIN menu m ON m.id_gerai = g.id_gerai
         WHERE g.status_pengajuan = 'approved'
         GROUP BY g.id_gerai
