@@ -33,15 +33,18 @@ if ($mysqli->connect_errno) {
 }
 $mysqli->set_charset('utf8mb4');
 
-// Ambil daftar ulasan + pesanan (gabung nama menu yang ada di transaksi tsb)
-$ulasanSql = "SELECT u.id_ulasan, u.rating, t.id_transaksi,
-       GROUP_CONCAT(DISTINCT m.nama_menu ORDER BY m.nama_menu SEPARATOR ', ') AS pesanan
+// Ambil daftar ulasan + pesanan + nama & foto user
+// Kolom tambahan diasumsikan: ulasan.is_anonymous (TINYINT 0/1) dan users.nama_lengkap, users.photo_path
+$ulasanSql = "SELECT u.id_ulasan, u.rating, u.komentar, u.is_anonymous, t.id_transaksi,
+    GROUP_CONCAT(DISTINCT m.nama_menu ORDER BY m.nama_menu SEPARATOR ', ') AS pesanan,
+    us.nama_lengkap, us.photo_path
 FROM transaksi t
 JOIN ulasan u ON u.id_transaksi = t.id_transaksi
+JOIN users us ON us.id_users = u.id_users
 LEFT JOIN transaksi_item ti ON ti.id_transaksi = t.id_transaksi
 LEFT JOIN menu m ON m.id_menu = ti.id_menu
 WHERE t.id_gerai = ?
-GROUP BY u.id_ulasan, u.rating, t.id_transaksi
+GROUP BY u.id_ulasan, u.rating, u.komentar, u.is_anonymous, t.id_transaksi, us.nama_lengkap, us.photo_path
 ORDER BY u.id_ulasan DESC
 LIMIT 500";
 
@@ -51,10 +54,23 @@ if ($stmt = $mysqli->prepare($ulasanSql)) {
     $stmt->execute();
     $res = $stmt->get_result();
     while ($row = $res->fetch_assoc()) {
+        $name = $row['nama_lengkap'] ?: 'Pengguna';
+        $isAnon = (int)$row['is_anonymous'] === 1;
+        if ($isAnon) {
+            // Masking: huruf pertama + **** + huruf terakhir (jika panjang>2)
+            $len = mb_strlen($name);
+            if ($len <= 2) {
+                $name = mb_substr($name,0,1) . str_repeat('*', $len-1);
+            } else {
+                $name = mb_substr($name,0,1) . str_repeat('*', $len-2) . mb_substr($name,-1);
+            }
+        }
         $reviews[] = [
-            'name' => 'Pengguna', // Placeholder (tidak ada info user di spesifikasi). Sesuaikan jika ada kolom nama.
+            'name' => $name,
+            'photo' => $isAnon ? null : ($row['photo_path'] ?: null),
             'pesanan' => $row['pesanan'] ?: '',
             'rating' => (int)$row['rating'],
+            'komentar' => $row['komentar'] ?: '',
         ];
     }
     $stmt->close();
