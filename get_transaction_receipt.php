@@ -16,10 +16,11 @@ if($bookingId==='' && $idTransaksi<=0){ echo json_encode(['success'=>false,'mess
 
 $where = $bookingId!=='' ? "t.booking_id='".$mysqli->real_escape_string($bookingId)."'" : 't.id_transaksi='.(int)$idTransaksi;
 $sql = "SELECT t.id_transaksi,t.booking_id,t.status,t.jenis_pengantaran,t.metode_pembayaran,t.total_harga,t.biaya_pengantaran,t.created_at,t.catatan_pembatalan,
-         t.id_alamat, g.nama_gerai,g.detail_alamat AS seller_alamat,
-         a.nama_gedung AS buyer_nama_gedung,a.detail_pengantaran AS buyer_detail
+    t.id_alamat, g.nama_gerai,g.detail_alamat AS seller_alamat, gp.listing_path,
+    a.nama_gedung AS buyer_nama_gedung,a.detail_pengantaran AS buyer_detail
   FROM transaksi t
   JOIN gerai g ON g.id_gerai=t.id_gerai
+  LEFT JOIN gerai_profil gp ON gp.id_gerai = g.id_gerai
   LEFT JOIN alamat_pengantaran a ON a.id_alamat=t.id_alamat
   WHERE $where LIMIT 1";
 $res = $mysqli->query($sql);
@@ -84,6 +85,7 @@ echo json_encode(['success'=>true,'data'=>[
   'seller_alamat'=>$tx['seller_alamat'],
   'locationSeller'=>$tx['seller_alamat'],
   'locationBuyer'=>$locationBuyer,
+  'listing_path'=>isset($tx['listing_path'])?$tx['listing_path']:null,
   'id_alamat'=> isset($tx['id_alamat']) ? (int)$tx['id_alamat'] : null,
   'buyer_building'=>$buyerBuilding,
   'buyer_detail'=>$buyerDetail,

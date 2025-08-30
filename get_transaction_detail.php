@@ -18,7 +18,7 @@ if($bookingId==='' && $idTransaksi<=0){
 }
 
 $where = $bookingId!=='' ? "t.booking_id='".$mysqli->real_escape_string($bookingId)."'" : 't.id_transaksi='.$idTransaksi;
-$sql = "SELECT t.id_transaksi,t.booking_id,t.STATUS,t.jenis_pengantaran,t.id_users,t.id_gerai,t.metode_pembayaran,t.bukti_pembayaran,t.catatan_pembatalan,g.nama_gerai,g.detail_alamat,g.qris_path,t.id_alamat FROM transaksi t JOIN gerai g ON g.id_gerai=t.id_gerai WHERE $where LIMIT 1";
+$sql = "SELECT t.id_transaksi,t.booking_id,t.STATUS,t.jenis_pengantaran,t.id_users,t.id_gerai,t.id_alamat,t.metode_pembayaran,t.bukti_pembayaran,t.catatan_pembatalan,g.nama_gerai,g.detail_alamat,g.qris_path, gp.listing_path FROM transaksi t JOIN gerai g ON g.id_gerai=t.id_gerai LEFT JOIN gerai_profil gp ON gp.id_gerai = g.id_gerai WHERE $where LIMIT 1";
 $res = $mysqli->query($sql);
 if(!$res || $res->num_rows===0){echo json_encode(['success'=>false,'message'=>'Transaksi tidak ditemukan']);exit;}
 $tx = $res->fetch_assoc();
@@ -90,6 +90,7 @@ echo json_encode(['success'=>true,'data'=>[
   'bukti_pembayaran'=>$tx['bukti_pembayaran'],
   'qris_path'=>$tx['qris_path'],
   'locationSeller'=>$tx['detail_alamat'],
+  'listing_path'=>isset($tx['listing_path'])?$tx['listing_path']:null,
   'locationBuyer'=>$locationBuyer,
   'buildingNameBuyer'=>isset($buildingNameBuyer)?$buildingNameBuyer:'',
   'alamat_pengantaran'=>[
