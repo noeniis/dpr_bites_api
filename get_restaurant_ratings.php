@@ -35,14 +35,14 @@ $mysqli->set_charset('utf8mb4');
 // Ambil daftar ulasan + pesanan + nama & foto user + balasan
 $ulasanSql = "SELECT u.id_ulasan, u.rating, u.komentar, u.balasan, u.is_anonymous, t.id_transaksi,
     GROUP_CONCAT(DISTINCT m.nama_menu ORDER BY m.nama_menu SEPARATOR ', ') AS pesanan,
-    us.nama_lengkap, us.photo_path
+    us.nama_lengkap, us.photo_path, u.created_at
 FROM transaksi t
 JOIN ulasan u ON u.id_transaksi = t.id_transaksi
 JOIN users us ON us.id_users = u.id_users
 LEFT JOIN transaksi_item ti ON ti.id_transaksi = t.id_transaksi
 LEFT JOIN menu m ON m.id_menu = ti.id_menu
 WHERE t.id_gerai = ?
-GROUP BY u.id_ulasan, u.rating, u.komentar, u.balasan, u.is_anonymous, t.id_transaksi, us.nama_lengkap, us.photo_path
+GROUP BY u.id_ulasan, u.rating, u.komentar, u.balasan, u.is_anonymous, t.id_transaksi, us.nama_lengkap, us.photo_path, u.created_at
 ORDER BY u.id_ulasan DESC
 LIMIT 500";
 
@@ -64,13 +64,15 @@ if ($stmt = $mysqli->prepare($ulasanSql)) {
             }
         }
         $reviews[] = [
+
             'id_ulasan' => (int)$row['id_ulasan'],
             'name'      => $name,
             'photo'     => $isAnon ? null : ($row['photo_path'] ?: null),
             'pesanan'   => $row['pesanan'] ?: '',
             'rating'    => (int)$row['rating'],
             'komentar'  => $row['komentar'] ?: '',
-            'balasan'   => $row['balasan'] ?: ''  // <-- Tambahan
+            'balasan'   => $row['balasan'] ?: '',
+            'tanggal' => $row['created_at'] ?? '',
         ];
     }
     $stmt->close();

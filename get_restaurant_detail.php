@@ -108,8 +108,9 @@ if($etRes){
 }
 
 // Menu beserta order count (frequently ordered) -> hitung jumlah di transaksi_item
+// Tambahkan jumlah_stok ke SELECT agar dikirim ke frontend
 $menuSql = "SELECT m.id_menu AS id, m.nama_menu AS name, m.harga AS price, m.gambar_menu AS image,
-                   m.deskripsi_menu AS deskripsi, m.kategori,
+                   m.deskripsi_menu AS deskripsi, m.kategori, m.jumlah_stok,
                    e.nama_etalase AS etalase_label,
                    COALESCE(SUM(ti.jumlah),0) AS orderCount
             FROM menu m
@@ -136,7 +137,8 @@ if($ms){
             'kategori'=>$m['kategori'],
             'etalase_label'=>$m['etalase_label'] ?: $m['kategori'],
             'orderCount'=>(int)$m['orderCount'],
-            'recommended'=>false
+            'recommended'=>false,
+            'jumlah_stok'=>(int)($m['jumlah_stok'] ?? 0)
         ];
     }
     $ms->close();

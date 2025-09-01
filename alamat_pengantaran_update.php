@@ -13,7 +13,26 @@ $conn->set_charset('utf8mb4');
 
 // Read input
 $input = json_decode(file_get_contents('php://input'), true);
-$id_users  = isset($input['id_users']) ? intval($input['id_users']) : 0;
+
+// Determine requester id
+$req_user = 0;
+$authHeader = '';
+if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+  $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
+} elseif (function_exists('apache_request_headers')) {
+  $h = apache_request_headers();
+  if (isset($h['Authorization'])) $authHeader = $h['Authorization'];
+}
+if ($authHeader) {
+  if (preg_match('/Bearer\s+(\d+)/i', $authHeader, $m)) {
+    $req_user = intval($m[1]);
+  }
+}
+if ($req_user === 0 && isset($_SERVER['HTTP_X_USER_ID'])) {
+  $req_user = intval($_SERVER['HTTP_X_USER_ID']);
+}
+
+$id_users  = $req_user > 0 ? $req_user : (isset($input['id_users']) ? intval($input['id_users']) : 0);
 $id_alamat = isset($input['id_alamat']) ? intval($input['id_alamat']) : 0;
 
 $nama_penerima       = trim($input['nama_penerima'] ?? '');
