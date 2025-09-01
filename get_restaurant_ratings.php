@@ -5,13 +5,12 @@
 // {
 //   success: true/false,
 //   data: {
-//     rating: float,              // rata-rata (0 jika tidak ada)
-//     ratingCount: int,           // jumlah ulasan
-//     breakdown: [ {star:5,count:..},...,{star:1,count:..} ], // urutan 5->1 seperti UI sekarang
-//     reviews: [ {name:"Pengguna", pesanan:"Nasi Goreng, ...", rating:5}, ... ]
+//     rating: float,
+//     ratingCount: int,
+//     breakdown: [ {star:5,count:..},...,{star:1,count:..} ],
+//     reviews: [ {id_ulasan:1, name:"Pengguna", pesanan:"Nasi Goreng", rating:5, komentar:"...", balasan:"..."}, ... ]
 //   }
 // }
-// Jika tidak ada data ulasan: rating=0, ratingCount=0, semua breakdown count=0, reviews=[]
 
 error_reporting(E_ALL & ~E_NOTICE & ~E_WARNING & ~E_DEPRECATED & ~E_STRICT);
 ini_set('display_errors', 0);
@@ -33,9 +32,8 @@ if ($mysqli->connect_errno) {
 }
 $mysqli->set_charset('utf8mb4');
 
-// Ambil daftar ulasan + pesanan + nama & foto user
-// Kolom tambahan diasumsikan: ulasan.is_anonymous (TINYINT 0/1) dan users.nama_lengkap, users.photo_path
-$ulasanSql = "SELECT u.id_ulasan, u.rating, u.komentar, u.is_anonymous, t.id_transaksi,
+// Ambil daftar ulasan + pesanan + nama & foto user + balasan
+$ulasanSql = "SELECT u.id_ulasan, u.rating, u.komentar, u.balasan, u.is_anonymous, t.id_transaksi,
     GROUP_CONCAT(DISTINCT m.nama_menu ORDER BY m.nama_menu SEPARATOR ', ') AS pesanan,
     us.nama_lengkap, us.photo_path, u.created_at
 FROM transaksi t
@@ -44,7 +42,7 @@ JOIN users us ON us.id_users = u.id_users
 LEFT JOIN transaksi_item ti ON ti.id_transaksi = t.id_transaksi
 LEFT JOIN menu m ON m.id_menu = ti.id_menu
 WHERE t.id_gerai = ?
-GROUP BY u.id_ulasan, u.rating, u.komentar, u.is_anonymous, t.id_transaksi, us.nama_lengkap, us.photo_path, u.created_at
+GROUP BY u.id_ulasan, u.rating, u.komentar, u.balasan, u.is_anonymous, t.id_transaksi, us.nama_lengkap, us.photo_path, u.created_at
 ORDER BY u.id_ulasan DESC
 LIMIT 500";
 
@@ -57,7 +55,7 @@ if ($stmt = $mysqli->prepare($ulasanSql)) {
         $name = $row['nama_lengkap'] ?: 'Pengguna';
         $isAnon = (int)$row['is_anonymous'] === 1;
         if ($isAnon) {
-            // Masking: huruf pertama + **** + huruf terakhir (jika panjang>2)
+            // Masking nama
             $len = mb_strlen($name);
             if ($len <= 2) {
                 $name = mb_substr($name,0,1) . str_repeat('*', $len-1);
@@ -66,23 +64,26 @@ if ($stmt = $mysqli->prepare($ulasanSql)) {
             }
         }
         $reviews[] = [
-            'name' => $name,
-            'photo' => $isAnon ? null : ($row['photo_path'] ?: null),
-            'pesanan' => $row['pesanan'] ?: '',
-            'rating' => (int)$row['rating'],
-            'komentar' => $row['komentar'] ?: '',
+
+            'id_ulasan' => (int)$row['id_ulasan'],
+            'name'      => $name,
+            'photo'     => $isAnon ? null : ($row['photo_path'] ?: null),
+            'pesanan'   => $row['pesanan'] ?: '',
+            'rating'    => (int)$row['rating'],
+            'komentar'  => $row['komentar'] ?: '',
+            'balasan'   => $row['balasan'] ?: '',
             'tanggal' => $row['created_at'] ?? '',
         ];
     }
     $stmt->close();
 }
 
+// Hitung breakdown rating
 $ratingCount = count($reviews);
 $sum = 0;
 $breakdownCount = [1=>0,2=>0,3=>0,4=>0,5=>0];
 foreach ($reviews as $r) {
     $star = (int)$r['rating'];
-    if ($star < 1 || $star > 5) $star = 0; // jaga-jaga
     if ($star >=1 && $star <=5) {
         $breakdownCount[$star]++;
         $sum += $star;
@@ -90,7 +91,7 @@ foreach ($reviews as $r) {
 }
 $avg = $ratingCount > 0 ? round($sum / $ratingCount, 2) : 0;
 
-// Bentuk breakdown urutan 5->1 agar cocok UI dummy
+// Bentuk breakdown urutan 5->1
 $breakdown = [];
 for ($s=5; $s>=1; $s--) {
     $breakdown[] = ['star'=>$s, 'count'=>$breakdownCount[$s]];
