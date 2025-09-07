@@ -32,6 +32,19 @@ if ($mysqli->connect_errno) {
 }
 $mysqli->set_charset('utf8mb4');
 
+// Ambil nama gerai
+$geraiName = '';
+if ($stmtG = $mysqli->prepare('SELECT nama_gerai FROM gerai WHERE id_gerai = ? LIMIT 1')) {
+    $stmtG->bind_param('i', $id);
+    if ($stmtG->execute()) {
+        $resG = $stmtG->get_result();
+        if ($rowG = $resG->fetch_assoc()) {
+            $geraiName = $rowG['nama_gerai'] ?? '';
+        }
+    }
+    $stmtG->close();
+}
+
 // Ambil daftar ulasan + pesanan + nama & foto user + balasan
 $ulasanSql = "SELECT u.id_ulasan, u.rating, u.komentar, u.balasan, u.is_anonymous, t.id_transaksi,
     GROUP_CONCAT(DISTINCT m.nama_menu ORDER BY m.nama_menu SEPARATOR ', ') AS pesanan,
@@ -98,10 +111,11 @@ for ($s=5; $s>=1; $s--) {
 }
 
 $data = [
-  'rating' => $avg,
-  'ratingCount' => $ratingCount,
-  'breakdown' => $breakdown,
-  'reviews' => $reviews,
+    'rating' => $avg,
+    'ratingCount' => $ratingCount,
+    'breakdown' => $breakdown,
+    'reviews' => $reviews,
+    'gerai_name' => $geraiName,
 ];
 
 $debug = trim(ob_get_clean());
