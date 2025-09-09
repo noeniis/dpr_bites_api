@@ -30,6 +30,21 @@ $addonsExplicit = array_key_exists('addons',$payload);
 $noteProvided = array_key_exists('note',$payload);
 $note = $noteProvided ? trim((string)$payload['note']) : null; // optional per-item note
 
+// If item_id is provided, resolve its canonical menu and cart to avoid mismatches
+if ($itemIdParam>0 && $userId>0) {
+    $resIt = $mysqli->prepare("SELECT ki.id_keranjang_item, ki.id_menu, ki.id_keranjang, k.id_gerai FROM keranjang_item ki JOIN keranjang k ON k.id_keranjang=ki.id_keranjang WHERE ki.id_keranjang_item=? AND k.id_users=? LIMIT 1");
+    $resIt->bind_param('ii',$itemIdParam,$userId);
+    $resIt->execute(); $gi=$resIt->get_result();
+    if ($gi && $gi->num_rows>0) {
+        $row=$gi->fetch_assoc();
+        $menuId = (int)$row['id_menu'];
+        $geraiId = (int)$row['id_gerai'];
+        // Prefer using the item's cart if present
+        $resolvedCartId = (int)$row['id_keranjang'];
+    }
+    $resIt->close();
+}
+
 if ($userId<=0 || $geraiId<=0 || $menuId<=0) { $out['message']='Missing required ids'; echo json_encode($out); exit; }
 
 // Validate gerai & menu
@@ -65,7 +80,7 @@ $autoQtyDefault = 1;
 $mysqli->begin_transaction();
 try {
     // Find existing keranjang (cart) with status aktif for this user & gerai
-    $cartId = null;
+    $cartId = isset($resolvedCartId) ? (int)$resolvedCartId : null;
     $stmt = $mysqli->prepare("SELECT id_keranjang FROM keranjang WHERE id_users=? AND id_gerai=? AND status='aktif' ORDER BY id_keranjang DESC LIMIT 1");
     $stmt->bind_param('ii',$userId,$geraiId);
     $stmt->execute();
