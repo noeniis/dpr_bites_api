@@ -3,6 +3,12 @@ date_default_timezone_set('Asia/Jakarta');
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
+
+require 'vendor/autoload.php';
+require 'config.php';
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+
 header('Content-Type: application/json');
 
 // Ambil data JSON dari request
@@ -34,10 +40,21 @@ if ($stmt->num_rows > 0) {
     $stmt->fetch();
     if (password_verify($password, $hashed_password)) {
         $roleInt = (int)$role; // enum value '0','1','2' as int
+        // Generate JWT
+        $payload = [
+            'iss' => 'dpr_bites',
+            'iat' => time(),
+            'exp' => time() + 3600, // expired 1 jam
+            'id_users' => $id_users,
+            'role' => $roleInt
+        ];
+    $jwt = JWT::encode($payload, JWT_SECRET, 'HS256');
+
         $response = [
             'success' => true,
             'id_users' => $id_users,
-            'role' => $roleInt
+            'role' => $roleInt,
+            'token' => $jwt
         ];
         if ($roleInt === 1) { // 1 = penjual
             $response['step1'] = (bool)$step1;
