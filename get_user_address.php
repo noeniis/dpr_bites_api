@@ -1,39 +1,20 @@
 <?php
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+require_once __DIR__ . '/protected.php'; // sets $id_users from JWT or exits 401
+
 $conn = new mysqli("localhost", "root", "", "dpr_bites");
-
-$data = json_decode(file_get_contents("php://input"), true);
-
-// Determine requesting user id from Authorization or X-User-Id header, fallback to body
-$req_user = 0;
-$authHeader = '';
-if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
-} elseif (function_exists('apache_request_headers')) {
-    $h = apache_request_headers();
-    if (isset($h['Authorization'])) $authHeader = $h['Authorization'];
-}
-if ($authHeader) {
-    if (preg_match('/Bearer\s+(\d+)/i', $authHeader, $m)) {
-        $req_user = intval($m[1]);
-    }
-}
-if ($req_user === 0 && isset($_SERVER['HTTP_X_USER_ID'])) {
-    $req_user = intval($_SERVER['HTTP_X_USER_ID']);
-}
-if ($req_user === 0 && isset($data['id_users'])) {
-    $req_user = intval($data['id_users']);
-}
-
-if ($req_user <= 0) {
-    http_response_code(400);
-    echo json_encode(["success" => false, "message" => "ID user wajib diisi atau berada di header"]);
+if ($conn->connect_error) {
+    http_response_code(500);
+    echo json_encode(["success" => false, "message" => "DB connection error"]);
     exit;
 }
 
-// Ambil alamat utama dari tabel alamat_pengantaran untuk user yang sedang login
+// Ambil alamat utama dari tabel alamat_pengantaran untuk user dari token
 $stmt = $conn->prepare("SELECT nama_gedung, detail_pengantaran FROM alamat_pengantaran WHERE id_users=? AND alamat_utama=1 LIMIT 1");
-$stmt->bind_param("i", $req_user);
+$stmt->bind_param("i", $id_users);
 $stmt->execute();
 $res = $stmt->get_result();
 

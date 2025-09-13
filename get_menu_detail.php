@@ -1,7 +1,12 @@
 <?php
-include 'db.php';
-
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Accept, Authorization');
+if($_SERVER['REQUEST_METHOD']==='OPTIONS'){http_response_code(204);exit;}
+
+require_once __DIR__ . '/protected.php';
+include 'db.php';
 
 if (isset($_POST['update_tersedia'])) {
     // Update tersedia untuk menu atau addon

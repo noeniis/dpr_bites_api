@@ -2,8 +2,13 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if($_SERVER['REQUEST_METHOD']==='OPTIONS'){http_response_code(204);exit;}
+$requireAuth = true;
+if ($requireAuth) {
+  require_once __DIR__ . '/protected.php';
+  $token_user_id = isset($id_users) ? (int)$id_users : 0;
+}
 
 date_default_timezone_set('Asia/Jakarta');
 $host='localhost';$user='root';$pass='';$db='dpr_bites';$port=3306;
@@ -23,6 +28,12 @@ $res = $mysqli->query($sql);
 if(!$res || $res->num_rows===0){echo json_encode(['success'=>false,'message'=>'Transaksi tidak ditemukan']);exit;}
 $tx = $res->fetch_assoc();
 $res->free();
+// Ownership enforcement
+if ($requireAuth && ($token_user_id <= 0 || (int)$tx['id_users'] !== $token_user_id)) {
+  http_response_code(403);
+  echo json_encode(['success'=>false,'message'=>'Access denied']);
+  exit;
+}
 
 $idT = intval($tx['id_transaksi']);
 $idAlamat = isset($tx['id_alamat']) ? intval($tx['id_alamat']) : 0;

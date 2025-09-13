@@ -3,8 +3,12 @@ date_default_timezone_set('Asia/Jakarta');
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
+
+// Require JWT and get user id from token
+require_once __DIR__ . '/protected.php';
+$token_user_id = isset($id_users) ? (int)$id_users : 0;
 
 $out = ['success'=>false,'message'=>'','data'=>null];
 $mysqli = @new mysqli('localhost','root','','dpr_bites');
@@ -15,7 +19,7 @@ $raw = file_get_contents('php://input');
 $payload = json_decode($raw,true);
 if (!is_array($payload)) $payload = $_POST;
 
-$userId  = isset($payload['user_id']) ? (int)$payload['user_id'] : 0;
+$userId  = $token_user_id; // always use token user
 $geraiId = isset($payload['gerai_id']) ? (int)$payload['gerai_id'] : 0;
 $menuId  = isset($payload['menu_id']) ? (int)$payload['menu_id'] : 0;
 // Optional explicit row targeting (variant editing)
