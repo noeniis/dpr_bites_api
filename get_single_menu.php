@@ -2,8 +2,9 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Accept, Authorization');
 if($_SERVER['REQUEST_METHOD']==='OPTIONS'){http_response_code(204);exit;}
+require_once __DIR__ . '/protected.php';
 $host='localhost';$user='root';$pass='';$db='dpr_bites';$port=3306;
 $mysqli=@new mysqli($host,$user,$pass,$db,$port);
 if($mysqli->connect_errno){echo json_encode(['success'=>false,'message'=>'DB error']);exit;}

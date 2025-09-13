@@ -5,8 +5,13 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if($_SERVER['REQUEST_METHOD']==='OPTIONS'){http_response_code(204);exit;}
+$requireAuth = true;
+if ($requireAuth) {
+  require_once __DIR__ . '/protected.php';
+  $token_user_id = isset($id_users) ? (int)$id_users : 0;
+}
 
 date_default_timezone_set('Asia/Jakarta');
 $host='localhost';$user='root';$pass='';$db='dpr_bites';$port=3306;
@@ -26,9 +31,10 @@ if($idTransaksi<=0 && $bookingId===''){echo json_encode(['success'=>false,'messa
 if(!$buktiBase64){echo json_encode(['success'=>false,'message'=>'bukti_base64 wajib']);exit;}
 
 $where = $idTransaksi>0 ? 'id_transaksi='.$idTransaksi : "booking_id='".$mysqli->real_escape_string($bookingId)."'";
-$res=$mysqli->query("SELECT id_transaksi, STATUS, metode_pembayaran FROM transaksi WHERE $where LIMIT 1");
+$res=$mysqli->query("SELECT id_transaksi, id_users, STATUS, metode_pembayaran FROM transaksi WHERE $where LIMIT 1");
 if(!$res||$res->num_rows===0){echo json_encode(['success'=>false,'message'=>'Transaksi tidak ditemukan']);exit;}
 $row=$res->fetch_assoc();$res->free();
+if ($requireAuth && ($token_user_id <= 0 || (int)$row['id_users'] !== $token_user_id)) { echo json_encode(['success'=>false,'message'=>'Access denied']); exit; }
 if($row['metode_pembayaran']!=='qris'){echo json_encode(['success'=>false,'message'=>'Metode bukan qris']);exit;}
 if($row['STATUS']!=='konfirmasi_pembayaran'){echo json_encode(['success'=>false,'message'=>'Status bukan konfirmasi_pembayaran']);exit;}
 

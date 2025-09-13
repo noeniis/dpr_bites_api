@@ -1,6 +1,18 @@
 <?php
 header('Content-Type: application/json');
 
+// Enforce JWT auth (silent include to avoid output noise)
+ob_start();
+require_once __DIR__ . '/protected.php';
+ob_end_clean();
+// protected.php should set $id_users from token
+$auth_user_id = isset($id_users) ? intval($id_users) : 0;
+if ($auth_user_id <= 0) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    exit;
+}
+
 // Koneksi database
 $host = 'localhost';
 $user = 'root';
@@ -12,35 +24,10 @@ if ($conn->connect_error) {
     exit;
 }
 
-// Ambil data dari request
+// Body is optional, we'll trust token user id
 $data = json_decode(file_get_contents('php://input'), true);
 
-// Determine requesting user: Authorization Bearer <id> or X-User-Id header or fallback to body
-$req_user = 0;
-$authHeader = '';
-if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
-} elseif (function_exists('apache_request_headers')) {
-    $h = apache_request_headers();
-    if (isset($h['Authorization'])) $authHeader = $h['Authorization'];
-}
-if ($authHeader) {
-    if (preg_match('/Bearer\s+(\d+)/i', $authHeader, $m)) {
-        $req_user = intval($m[1]);
-    }
-}
-if ($req_user === 0 && isset($_SERVER['HTTP_X_USER_ID'])) {
-    $req_user = intval($_SERVER['HTTP_X_USER_ID']);
-}
-if ($req_user === 0 && isset($data['id_users'])) {
-    $req_user = intval($data['id_users']);
-}
-
-if ($req_user <= 0) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Parameter id_users tidak ditemukan atau tidak valid']);
-    exit;
-}
+$req_user = $auth_user_id;
 
 $sql = "SELECT * FROM alamat_pengantaran WHERE id_users = ?";
 $stmt = $conn->prepare($sql);

@@ -3,9 +3,13 @@ date_default_timezone_set('Asia/Jakarta');
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-// Allow custom header used by the app
-header('Access-Control-Allow-Headers: Content-Type, X-User-Id');
+// Allow Authorization for JWT
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
+
+// Require JWT and get user id from token
+require_once __DIR__ . '/protected.php';
+$token_user_id = isset($id_users) ? (int)$id_users : 0;
 
 $out = ['success'=>false,'message'=>'','favorited'=>false];
 $mysqli = @new mysqli('localhost','root','','dpr_bites');
@@ -13,27 +17,17 @@ if ($mysqli->connect_errno) { $out['message']='DB connection failed'; echo json_
 $mysqli->set_charset('utf8mb4');
 
 $method = $_SERVER['REQUEST_METHOD'];
-$userId = 0; $menuId = 0; $action = '';
+$userId = $token_user_id; $menuId = 0; $action = '';
 // Read from GET params for GET, or from JSON/form for POST
 if ($method === 'GET') {
-    $userId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
     $menuId = isset($_GET['menu_id']) ? (int)$_GET['menu_id'] : 0;
     $action = isset($_GET['action']) ? trim($_GET['action']) : '';
 } else {
     $raw = file_get_contents('php://input');
     $payload = json_decode($raw,true);
     if (!is_array($payload)) $payload = $_POST;
-    $userId = isset($payload['user_id']) ? (int)$payload['user_id'] : 0;
     $menuId = isset($payload['menu_id']) ? (int)$payload['menu_id'] : 0;
     $action = isset($payload['action']) ? trim($payload['action']) : '';
-}
-
-// Also accept X-User-Id header as fallback (some clients send user id in header)
-$headers = function_exists('getallheaders') ? getallheaders() : [];
-if (empty($userId) && isset($headers['X-User-Id'])) {
-    $userId = (int)$headers['X-User-Id'];
-} elseif (empty($userId) && isset($headers['x-user-id'])) {
-    $userId = (int)$headers['x-user-id'];
 }
 
 // Accept alternative keys for menu id to be resilient to different client payload shapes
@@ -50,7 +44,7 @@ if (empty($menuId)) {
     if (empty($menuId) && isset($_GET['id_menu'])) $menuId = (int)$_GET['id_menu'];
 }
 
-if ($userId<=0 || $menuId<=0) { $out['message']='Missing user_id/menu_id'; echo json_encode($out); exit; }
+if ($userId<=0 || $menuId<=0) { $out['message']='Missing user or menu id'; echo json_encode($out); exit; }
 
 // Ensure menu exists
 $chk = $mysqli->prepare("SELECT id_menu FROM menu WHERE id_menu=? LIMIT 1");

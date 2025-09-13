@@ -3,7 +3,7 @@ date_default_timezone_set('Asia/Jakarta');
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
 $host = 'localhost'; $user = 'root'; $pass = ''; $db = 'dpr_bites'; $port = 3306;
@@ -20,11 +20,14 @@ $raw = file_get_contents('php://input');
 if (!$raw) { echo json_encode(['success'=>false,'message'=>'Empty body']); exit; }
 $data = json_decode($raw, true);
 if (!is_array($data)) { echo json_encode(['success'=>false,'message'=>'Invalid JSON']); exit; }
+// Require JWT and get user id from token
+require_once __DIR__ . '/protected.php';
+$token_user_id = isset($id_users) ? (int)$id_users : 0;
 // Simple server-side log (ensure web server user can write tmp dir)
 @file_put_contents(__DIR__.'/create_transaction_debug.log', date('c')." RAW=".$raw."\n", FILE_APPEND);
 
 // Map & validate fields (DB schema)
-$userId  = intval($data['id_users'] ?? $data['user_id'] ?? 0);
+$userId  = $token_user_id; // always use token user
 $geraiId = intval($data['id_gerai'] ?? $data['gerai_id'] ?? 0);
 $metode  = ($data['metode_pembayaran'] ?? $data['payment_method'] ?? 'qris');
 // Normalisasi jenis_pengantaran; fallback ke is_delivery (true=>pengantaran)

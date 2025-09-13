@@ -2,8 +2,13 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if($_SERVER['REQUEST_METHOD']==='OPTIONS'){http_response_code(204);exit;}
+$requireAuth = true;
+if ($requireAuth) {
+  require_once __DIR__ . '/protected.php';
+  $token_user_id = isset($id_users) ? (int)$id_users : 0;
+}
 
 date_default_timezone_set('Asia/Jakarta');
 $host='localhost';$user='root';$pass='';$db='dpr_bites';$port=3306;
@@ -12,7 +17,7 @@ if($mysqli->connect_errno){echo json_encode(['success'=>false,'message'=>'DB err
 $mysqli->set_charset('utf8mb4');
 
 $idTransaksi = isset($_GET['id_transaksi']) ? (int)$_GET['id_transaksi'] : 0;
-$idUsers = isset($_GET['id_users']) ? (int)$_GET['id_users'] : 0;
+$idUsers = $requireAuth ? $token_user_id : (isset($_GET['id_users']) ? (int)$_GET['id_users'] : 0);
 if($idTransaksi<=0 || $idUsers<=0){
   echo json_encode(['success'=>false,'message'=>'id_transaksi & id_users wajib']);
   exit;

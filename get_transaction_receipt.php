@@ -2,7 +2,7 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if($_SERVER['REQUEST_METHOD']==='OPTIONS'){http_response_code(204);exit;}
 date_default_timezone_set('Asia/Jakarta');
 $host='localhost';$user='root';$pass='';$db='dpr_bites';$port=3306;
@@ -10,13 +10,17 @@ $mysqli=@new mysqli($host,$user,$pass,$db,$port);
 if($mysqli->connect_errno){echo json_encode(['success'=>false,'message'=>'DB error: '.$mysqli->connect_error]);exit;}
 $mysqli->set_charset('utf8mb4');
 
+// Require JWT and get user id from token
+require_once __DIR__ . '/protected.php';
+$token_user_id = isset($id_users) ? (int)$id_users : 0;
+
 $bookingId = isset($_GET['booking_id']) ? trim($_GET['booking_id']) : '';
 $idTransaksi = isset($_GET['id_transaksi']) ? (int)$_GET['id_transaksi'] : 0;
 if($bookingId==='' && $idTransaksi<=0){ echo json_encode(['success'=>false,'message'=>'booking_id atau id_transaksi wajib']); exit; }
 
 $where = $bookingId!=='' ? "t.booking_id='".$mysqli->real_escape_string($bookingId)."'" : 't.id_transaksi='.(int)$idTransaksi;
 $sql = "SELECT t.id_transaksi,t.booking_id,t.status,t.jenis_pengantaran,t.metode_pembayaran,t.total_harga,t.biaya_pengantaran,t.created_at,t.catatan_pembatalan,
-    t.id_alamat, g.nama_gerai,g.detail_alamat AS seller_alamat, gp.listing_path,
+    t.id_alamat, t.id_users, g.nama_gerai,g.detail_alamat AS seller_alamat, gp.listing_path,
     a.nama_gedung AS buyer_nama_gedung,a.detail_pengantaran AS buyer_detail
   FROM transaksi t
   JOIN gerai g ON g.id_gerai=t.id_gerai
@@ -28,6 +32,13 @@ if(!$res || $res->num_rows===0){ echo json_encode(['success'=>false,'message'=>'
 $tx=$res->fetch_assoc();
 $res->free();
 $idT=(int)$tx['id_transaksi'];
+
+// Enforce ownership: the transaksi must belong to token user
+if ($token_user_id <= 0 || (int)$tx['id_users'] !== $token_user_id) {
+  http_response_code(403);
+  echo json_encode(['success'=>false,'message'=>'Access denied']);
+  exit;
+}
 
 // Items + addons
 $orderSummary=[]; $subtotal=0;

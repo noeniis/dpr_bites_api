@@ -1,6 +1,17 @@
 <?php
 header('Content-Type: application/json');
 
+// Enforce JWT auth (silent include)
+ob_start();
+require_once __DIR__ . '/protected.php';
+ob_end_clean();
+$auth_user_id = isset($id_users) ? (int)$id_users : 0;
+if ($auth_user_id <= 0) {
+  http_response_code(401);
+  echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+  exit;
+}
+
 // Inline DB connection
 $host = 'localhost'; $user = 'root'; $pass = ''; $db = 'dpr_bites'; $port = 3306;
 $conn = new mysqli($host, $user, $pass, $db, $port);
@@ -14,25 +25,7 @@ $conn->set_charset('utf8mb4');
 // Read input
 $input = json_decode(file_get_contents('php://input'), true);
 
-// Determine requester id
-$req_user = 0;
-$authHeader = '';
-if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-  $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
-} elseif (function_exists('apache_request_headers')) {
-  $h = apache_request_headers();
-  if (isset($h['Authorization'])) $authHeader = $h['Authorization'];
-}
-if ($authHeader) {
-  if (preg_match('/Bearer\s+(\d+)/i', $authHeader, $m)) {
-    $req_user = intval($m[1]);
-  }
-}
-if ($req_user === 0 && isset($_SERVER['HTTP_X_USER_ID'])) {
-  $req_user = intval($_SERVER['HTTP_X_USER_ID']);
-}
-
-$id_users  = $req_user > 0 ? $req_user : (isset($input['id_users']) ? intval($input['id_users']) : 0);
+$id_users  = $auth_user_id;
 $id_alamat = isset($input['id_alamat']) ? intval($input['id_alamat']) : 0;
 
 $nama_penerima       = trim($input['nama_penerima'] ?? '');
@@ -43,7 +36,7 @@ $longitude           = isset($input['longitude']) ? floatval($input['longitude']
 $no_hp               = trim($input['no_hp'] ?? '');
 $alamat_utama        = (isset($input['alamat_utama']) && intval($input['alamat_utama']) === 1) ? 1 : 0;
 
-if ($id_users <= 0 || $id_alamat <= 0) {
+if ($id_alamat <= 0) {
   echo json_encode(['success' => false, 'message' => 'Invalid parameters']); exit;
 }
 

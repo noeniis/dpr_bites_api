@@ -3,15 +3,17 @@ date_default_timezone_set('Asia/Jakarta');
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-User-Id');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
+
+// Require JWT and get user id from token
+require_once __DIR__ . '/protected.php';
+$userId = isset($id_users) ? (int)$id_users : 0;
 
 $out = ['success'=>false,'message'=>'','data'=>null];
 $mysqli = @new mysqli('localhost','root','','dpr_bites');
 if ($mysqli->connect_errno) { $out['message']='DB connection failed'; echo json_encode($out); exit; }
 $mysqli->set_charset('utf8mb4');
-
-$userId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
 if ($userId<=0) { $out['message']='Missing user_id'; echo json_encode($out); exit; }
 
 // Ambil semua keranjang aktif user (bisa multi gerai)

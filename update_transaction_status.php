@@ -4,7 +4,7 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
 date_default_timezone_set('Asia/Jakarta');
@@ -16,6 +16,10 @@ $raw=file_get_contents('php://input');
 if(!$raw){echo json_encode(['success'=>false,'message'=>'Empty body']);exit;}
 $req=json_decode($raw,true);
 if(!is_array($req)){echo json_encode(['success'=>false,'message'=>'Invalid JSON']);exit;}
+
+// Require JWT and get user id from token
+require_once __DIR__ . '/protected.php';
+$token_user_id = isset($id_users) ? (int)$id_users : 0;
 
 $idTransaksi = intval($req['id_transaksi'] ?? 0);
 $bookingId = trim($req['booking_id'] ?? '');
@@ -36,13 +40,19 @@ if($idTransaksi>0){
   echo json_encode(['success'=>false,'message'=>'Harus sertakan id_transaksi atau booking_id']);exit;
 }
 
-$res=$mysqli->query("SELECT id_transaksi, STATUS, jenis_pengantaran, metode_pembayaran FROM transaksi WHERE $where LIMIT 1");
+$res=$mysqli->query("SELECT id_transaksi, id_users, STATUS, jenis_pengantaran, metode_pembayaran FROM transaksi WHERE $where LIMIT 1");
 if(!$res || $res->num_rows===0){echo json_encode(['success'=>false,'message'=>'Transaksi tidak ditemukan']);exit;}
 $row=$res->fetch_assoc();
+$res->free();
+
+// Basic ownership enforcement for user role (seller endpoints separate)
+if ($token_user_id <= 0 || (int)$row['id_users'] !== $token_user_id) {
+  echo json_encode(['success'=>false,'message'=>'Access denied']);
+  exit;
+}
 $current=$row['STATUS'];
 $jenis=$row['jenis_pengantaran'];
 $metode=$row['metode_pembayaran'];
-$res->free();
 
 // Validasi transition
 // Transition dasar
