@@ -1,13 +1,17 @@
 <?php
-require 'db.php';
 header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Headers: Content-Type, Accept, Authorization');
+@ini_set('display_errors', 0);
+error_reporting(E_ERROR | E_PARSE);
 
-// Ambil data dari JSON body
-$input = json_decode(file_get_contents('php://input'), true);
-$id_users = isset($input['id_users']) ? intval($input['id_users']) : null;
+require_once __DIR__.'/protected.php';
+require 'db.php';
 
-if (!$id_users) {
-    echo json_encode(['success' => false, 'error' => 'id_users required']);
+$id_users_int = isset($id_users) ? intval($id_users) : 0;
+if ($id_users_int <= 0) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
     exit;
 }
 
@@ -16,7 +20,7 @@ global $conn;
 // Cari id_gerai berdasarkan id_users
 $sql_gerai = "SELECT id_gerai FROM gerai WHERE id_users = ? LIMIT 1";
 $stmt_gerai = $conn->prepare($sql_gerai);
-$stmt_gerai->bind_param('i', $id_users);
+$stmt_gerai->bind_param('i', $id_users_int);
 $stmt_gerai->execute();
 $result_gerai = $stmt_gerai->get_result();
 
