@@ -1,6 +1,17 @@
 <?php
 header('Content-Type: application/json');
 
+// Enforce JWT auth (silent include to avoid extra output)
+ob_start();
+require_once __DIR__ . '/protected.php';
+ob_end_clean();
+$auth_user_id = isset($id_users) ? (int)$id_users : 0;
+if ($auth_user_id <= 0) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    exit;
+}
+
 // Koneksi ke database
 $host = 'localhost';
 $user = 'root';
@@ -14,31 +25,13 @@ if ($conn->connect_error) {
 
 $data = json_decode(file_get_contents('php://input'), true);
 
-// Determine requesting user from Authorization Bearer <id> or X-User-Id header, fallback to body
-$req_user = 0;
-$authHeader = '';
-if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
-} elseif (function_exists('apache_request_headers')) {
-    $h = apache_request_headers();
-    if (isset($h['Authorization'])) $authHeader = $h['Authorization'];
-}
-if ($authHeader) {
-    if (preg_match('/Bearer\s+(\d+)/i', $authHeader, $m)) {
-        $req_user = intval($m[1]);
-    }
-}
-if ($req_user === 0 && isset($_SERVER['HTTP_X_USER_ID'])) {
-    $req_user = intval($_SERVER['HTTP_X_USER_ID']);
-}
-
 if (!isset($data['nama_penerima'], $data['nama_gedung'], $data['detail_pengantaran'], $data['latitude'], $data['longitude'], $data['no_hp'], $data['alamat_utama'])) {
         echo json_encode(['success' => false, 'message' => 'Parameter tidak lengkap']);
         exit;
 }
 
-// Use requester identity, ignore any id_users client tried to send
-$id_users = $req_user > 0 ? $req_user : (isset($data['id_users']) ? intval($data['id_users']) : 0);
+// Use token user id, ignore any id_users client tried to send
+$id_users = $auth_user_id;
 $nama_penerima = $data['nama_penerima'];
 $nama_gedung = $data['nama_gedung'];
 $detail_pengantaran = $data['detail_pengantaran'];

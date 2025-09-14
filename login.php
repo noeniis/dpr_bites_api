@@ -44,7 +44,8 @@ if ($stmt->num_rows > 0) {
         $payload = [
             'iss' => 'dpr_bites',
             'iat' => time(),
-            'exp' => time() + 3600, // expired 1 jam
+            // Expire in 14 days
+            'exp' => time() + (14 * 24 * 60 * 60),
             'id_users' => $id_users,
             'role' => $roleInt
         ];

@@ -2,7 +2,7 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if($_SERVER['REQUEST_METHOD']==='OPTIONS'){http_response_code(204);exit;}
 
 date_default_timezone_set('Asia/Jakarta');
@@ -11,7 +11,9 @@ $mysqli=@new mysqli($host,$user,$pass,$db,$port);
 if($mysqli->connect_errno){echo json_encode(['success'=>false,'message'=>'DB error: '.$mysqli->connect_error]);exit;}
 $mysqli->set_charset('utf8mb4');
 
-$userId = isset($_GET['user_id']) ? (int)$_GET['user_id'] : 0;
+// Require JWT and get user id from token
+require_once __DIR__ . '/protected.php';
+$userId = isset($id_users) ? (int)$id_users : 0;
 if($userId<=0){ echo json_encode(['success'=>false,'message'=>'user_id wajib']); exit; }
 
 // Ambil semua transaksi user dengan join gerai

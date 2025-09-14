@@ -1,6 +1,17 @@
 <?php
 header('Content-Type: application/json');
 
+// Enforce JWT auth (silent include)
+ob_start();
+require_once __DIR__ . '/protected.php';
+ob_end_clean();
+$auth_user_id = isset($id_users) ? (int)$id_users : 0;
+if ($auth_user_id <= 0) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    exit;
+}
+
 // Koneksi DB
 $host = 'localhost';
 $user = 'root';
@@ -20,31 +31,7 @@ if (!isset($input['id_alamat'])) {
 }
 
 $id_alamat = (int)$input['id_alamat'];
-
-// Determine requester id
-$req_user = 0;
-$authHeader = '';
-if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
-} elseif (function_exists('apache_request_headers')) {
-    $h = apache_request_headers();
-    if (isset($h['Authorization'])) $authHeader = $h['Authorization'];
-}
-if ($authHeader) {
-    if (preg_match('/Bearer\s+(\d+)/i', $authHeader, $m)) {
-        $req_user = intval($m[1]);
-    }
-}
-if ($req_user === 0 && isset($_SERVER['HTTP_X_USER_ID'])) {
-    $req_user = intval($_SERVER['HTTP_X_USER_ID']);
-}
-
-if ($req_user <= 0) {
-    echo json_encode(['success' => false, 'message' => 'User tidak teridentifikasi']);
-    exit;
-}
-
-$id_users = $req_user;
+$id_users = $auth_user_id;
 
 // Hapus alamat milik user
 $stmt = $conn->prepare('DELETE FROM alamat_pengantaran WHERE id_users = ? AND id_alamat = ?');
