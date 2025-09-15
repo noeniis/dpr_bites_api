@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/protected.php';
 require 'db.php';
 
 $status = $_GET['status'] ?? 'pending';

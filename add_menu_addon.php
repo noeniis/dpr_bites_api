@@ -1,6 +1,7 @@
 <?php
+require_once __DIR__.'/protected.php';
+require 'db.php';
 header('Content-Type: application/json');
-require_once "db.php";
 
 // --- Ambil data ---
 $data = [];

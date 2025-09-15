@@ -17,9 +17,15 @@ if(!$raw){echo json_encode(['success'=>false,'message'=>'Empty body']);exit;}
 $req=json_decode($raw,true);
 if(!is_array($req)){echo json_encode(['success'=>false,'message'=>'Invalid JSON']);exit;}
 
-// Require JWT and get user id from token
+// Require JWT and get user id from token (use helper if available)
 require_once __DIR__ . '/protected.php';
-$token_user_id = isset($id_users) ? (int)$id_users : 0;
+if (function_exists('getTokenUserId')) {
+  $token_user_id = getTokenUserId();
+} elseif (function_exists('requireAuth')) {
+  $token_user_id = requireAuth();
+} else {
+  $token_user_id = isset($id_users) ? (int)$id_users : 0;
+}
 
 $idTransaksi = intval($req['id_transaksi'] ?? 0);
 $bookingId = trim($req['booking_id'] ?? '');
@@ -40,19 +46,54 @@ if($idTransaksi>0){
   echo json_encode(['success'=>false,'message'=>'Harus sertakan id_transaksi atau booking_id']);exit;
 }
 
-$res=$mysqli->query("SELECT id_transaksi, id_users, STATUS, jenis_pengantaran, metode_pembayaran FROM transaksi WHERE $where LIMIT 1");
+$res=$mysqli->query("SELECT id_transaksi, id_users, id_gerai, STATUS, jenis_pengantaran, metode_pembayaran FROM transaksi WHERE $where LIMIT 1");
 if(!$res || $res->num_rows===0){echo json_encode(['success'=>false,'message'=>'Transaksi tidak ditemukan']);exit;}
 $row=$res->fetch_assoc();
 $res->free();
 
-// Basic ownership enforcement for user role (seller endpoints separate)
-if ($token_user_id <= 0 || (int)$row['id_users'] !== $token_user_id) {
-  echo json_encode(['success'=>false,'message'=>'Access denied']);
-  exit;
-}
+// Role-based permission checks: allow seller owner for seller actions, buyer for buyer actions
 $current=$row['STATUS'];
 $jenis=$row['jenis_pengantaran'];
 $metode=$row['metode_pembayaran'];
+
+$seller_actions = ['konfirmasi_ketersediaan','disiapkan','diantar','pickup','selesai'];
+$buyer_actions = ['konfirmasi_pembayaran'];
+
+// Fetch gerai owner id to allow role checks without helper
+$geraiOwnerId = 0;
+if (isset($row['id_gerai']) && (int)$row['id_gerai'] > 0) {
+  $rG = $mysqli->query("SELECT id_users FROM gerai WHERE id_gerai = " . (int)$row['id_gerai'] . " LIMIT 1");
+  if ($rG && $rG->num_rows > 0) {
+    $gRow = $rG->fetch_assoc();
+    $geraiOwnerId = (int)$gRow['id_users'];
+    $rG->free();
+  }
+}
+
+if (in_array($newStatus, $seller_actions, true)) {
+  // require gerai owner for seller actions
+  if ($geraiOwnerId !== $token_user_id) {
+    echo json_encode(['success'=>false,'message'=>'Forbidden: seller only']);exit;
+  }
+} elseif (in_array($newStatus, $buyer_actions, true)) {
+  // require buyer for buyer actions
+  if ($token_user_id <= 0 || (int)$row['id_users'] !== $token_user_id) {
+    echo json_encode(['success'=>false,'message'=>'Forbidden: buyer only']);exit;
+  }
+} elseif ($newStatus === 'dibatalkan') {
+  // cancellation: allow buyer to cancel early, otherwise allow seller owner to cancel
+  $canByBuyer = ($token_user_id > 0 && (int)$row['id_users'] === $token_user_id && in_array($current, ['konfirmasi_ketersediaan','konfirmasi_pembayaran'], true));
+  $canBySeller = ($geraiOwnerId === $token_user_id);
+  if (!($canByBuyer || $canBySeller)) {
+    echo json_encode(['success'=>false,'message'=>'Forbidden: cannot cancel']);exit;
+  }
+} else {
+  // default: allow if buyer or gerai owner
+  $isOwner = ($geraiOwnerId === $token_user_id);
+  if (!($token_user_id > 0 && (int)$row['id_users'] === $token_user_id) && !$isOwner) {
+    echo json_encode(['success'=>false,'message'=>'Access denied']);exit;
+  }
+}
 
 // Validasi transition
 // Transition dasar

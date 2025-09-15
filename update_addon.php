@@ -1,6 +1,14 @@
 <?php
+require_once __DIR__ . '/protected.php';
 include 'db.php';
 header('Content-Type: application/json');
+
+// Ensure JWT validated and $id_users available
+if (!isset($id_users) || $id_users <= 0) {
+    http_response_code(401);
+    echo json_encode(["success" => false, "message" => "Unauthorized"]);
+    exit;
+}
 
 // --- Ambil data dari form-data ($_POST) ---
 $id_addon   = $_POST['id_addon']   ?? null;
@@ -9,6 +17,7 @@ $deskripsi  = $_POST['deskripsi']  ?? null;
 $harga      = $_POST['harga']      ?? null;
 $image_path = $_POST['image_path'] ?? null;
 $tersedia   = $_POST['tersedia']   ?? null;
+$stok       = $_POST['stok']       ?? null;
 
 // --- Kalau $_POST kosong, coba baca JSON body ---
 if ($id_addon === null && empty($_POST)) {
@@ -22,6 +31,7 @@ if ($id_addon === null && empty($_POST)) {
         $harga      = $data['harga']      ?? null;
         $image_path = $data['image_path'] ?? null;
         $tersedia   = $data['tersedia']   ?? null;
+        $stok       = $data['stok']       ?? null;
     }
 }
 
@@ -32,16 +42,28 @@ if ($id_addon === null) {
 }
 
 // Default value untuk tersedia
+// Normalize tersedia
 $tersedia = ($tersedia === "1" || $tersedia === 1 || $tersedia === true) ? 1 : 0;
+// Normalize stok (integer)
+if ($stok !== null) {
+    $stok = (int)$stok;
+} else {
+    $stok = null;
+}
 
 // --- Update data ke DB ---
-$query = "UPDATE addon SET 
-            nama_addon = '$nama_addon',
-            deskripsi = '$deskripsi',
-            harga = '$harga',
-            image_path = '$image_path',
-            tersedia = '$tersedia'
-          WHERE id_addon = '$id_addon'";
+$setParts = [];
+// Build set parts safely (basic escaping)
+$setParts[] = "nama_addon = '" . mysqli_real_escape_string($conn, $nama_addon) . "'";
+$setParts[] = "deskripsi = '" . mysqli_real_escape_string($conn, $deskripsi) . "'";
+$setParts[] = "harga = '" . mysqli_real_escape_string($conn, $harga) . "'";
+$setParts[] = "image_path = '" . mysqli_real_escape_string($conn, $image_path) . "'";
+$setParts[] = "tersedia = '" . mysqli_real_escape_string($conn, $tersedia) . "'";
+if ($stok !== null) {
+        $setParts[] = "stok = '" . mysqli_real_escape_string($conn, (string)$stok) . "'";
+}
+$setClause = implode(",\n    ", $setParts);
+$query = "UPDATE addon SET \n    $setClause\n    WHERE id_addon = '" . mysqli_real_escape_string($conn, $id_addon) . "'";
 
 $result = mysqli_query($conn, $query);
 

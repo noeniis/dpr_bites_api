@@ -1,8 +1,7 @@
 <?php
 // update_status_pengajuan.php
-// Endpoint untuk update status_pengajuan di tabel gerai
-
 date_default_timezone_set('Asia/Jakarta');
+require_once __DIR__.'/protected.php'; // JWT validation
 require 'db.php';
 header('Content-Type: application/json');
 

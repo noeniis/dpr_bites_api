@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__.'/protected.php';
 include 'db.php';
 
 header('Content-Type: application/json');
@@ -58,7 +59,7 @@ if ($id_gerai) {
         while ($ra = mysqli_fetch_assoc($qa)) {
             $addons[] = $ra;
         }
-        $row['add_ons'] = $addons;
+            $row['addons'] = $addons;
 
         $data[] = $row;
     }
@@ -76,5 +77,6 @@ if ($id_gerai) {
     $stmt->close();
 }
 
+    error_log('DEBUG get_menus.php response: ' . json_encode($data));
 echo json_encode(['success' => true, 'data' => $data]);
 ?>

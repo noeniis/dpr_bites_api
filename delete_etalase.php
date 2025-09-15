@@ -1,6 +1,11 @@
 <?php
 // delete_etalase.php (MySQLi)
 header('Access-Control-Allow-Origin: *');
+require_once __DIR__.'/protected.php';
+require 'db.php'; // harus menghasilkan $conn (mysqli)
+
+// delete_etalase.php (MySQLi)
+header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Content-Type: application/json; charset=utf-8');

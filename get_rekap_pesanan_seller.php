@@ -1,6 +1,8 @@
+
 <?php
 header('Content-Type: application/json');
-require_once 'db.php'; // ini harus ada $conn (mysqli)
+require_once __DIR__.'/protected.php'; 
+require_once 'db.php'; 
 
 // ambil param
 $id_gerai = $_GET['id_gerai'] ?? $_POST['id_gerai'] ?? null;
@@ -25,7 +27,6 @@ if (!$id_gerai) {
 }
 
 try {
-    // --------- Rekap jumlah per status (dinormalisasi) ----------
     $sqlRekap = "
         SELECT REPLACE(LOWER(status), ' ', '_') AS st, COUNT(*) AS cnt
         FROM transaksi

@@ -5,7 +5,7 @@ header('Access-Control-Allow-Headers: Content-Type, Accept, Authorization');
 @ini_set('display_errors', 0);
 error_reporting(E_ERROR | E_PARSE);
 
-require_once __DIR__.'/protected.php';
+require_once __DIR__.'/protected.php'; // Sudah include JWT
 require 'db.php';
 
 $id_users_int = isset($id_users) ? intval($id_users) : 0;

@@ -1,6 +1,14 @@
 <?php
 header('Content-Type: application/json');
+require_once __DIR__ . '/protected.php';
 require_once 'db.php';
+
+// Ensure JWT validated
+if (!isset($id_users) || $id_users <= 0) {
+  http_response_code(401);
+  echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+  exit;
+}
 
 $id_gerai = $_GET['id_gerai'] ?? $_POST['id_gerai'] ?? '';
 $id_gerai = trim($id_gerai);

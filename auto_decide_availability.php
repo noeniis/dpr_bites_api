@@ -4,7 +4,7 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
@@ -40,6 +40,14 @@ $idTransaksi = intval($req['id_transaksi'] ?? 0);
 $bookingId   = trim($req['booking_id'] ?? '');
 $available   = isset($req['available']) ? (bool)$req['available'] : null;
 $alasan      = trim($req['alasan'] ?? '');
+
+// Validate JWT and get $id_users
+require_once __DIR__ . '/protected.php';
+if (!isset($id_users) || $id_users <= 0) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+    exit;
+}
 
 if ($available === null) {
     echo json_encode(['success' => false, 'message' => 'available boolean wajib']);

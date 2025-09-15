@@ -1,5 +1,6 @@
 <?php
 header('Content-Type: application/json');
+require_once __DIR__.'/protected.php';
 require_once "db.php"; // koneksi ke database
 
 // --- Ambil data ---

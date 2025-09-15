@@ -4,9 +4,16 @@ header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 if($_SERVER['REQUEST_METHOD']==='OPTIONS'){http_response_code(204);exit;}
-$requireAuth = true;
-if ($requireAuth) {
-  require_once __DIR__ . '/protected.php';
+// Require JWT and determine token user id
+require_once __DIR__ . '/protected.php';
+// Prefer explicit token helper to read user id from Authorization header
+if (function_exists('getTokenUserId')) {
+  $token_user_id = getTokenUserId();
+} elseif (function_exists('requireAuth')) {
+  // requireAuth() exits with 401 on failure and returns user id on success
+  $token_user_id = requireAuth();
+} else {
+  // Last resort: use $id_users if protected.php set it earlier
   $token_user_id = isset($id_users) ? (int)$id_users : 0;
 }
 
@@ -28,10 +35,47 @@ $res = $mysqli->query($sql);
 if(!$res || $res->num_rows===0){echo json_encode(['success'=>false,'message'=>'Transaksi tidak ditemukan']);exit;}
 $tx = $res->fetch_assoc();
 $res->free();
-// Ownership enforcement
-if ($requireAuth && ($token_user_id <= 0 || (int)$tx['id_users'] !== $token_user_id)) {
+// Ownership enforcement: allow access if token belongs to the buyer (tx.id_users)
+// OR if token belongs to the owner of the gerai associated with the transaction.
+if ($token_user_id <= 0) {
+  http_response_code(401);
+  echo json_encode(['success'=>false,'message'=>'Unauthorized']);
+  exit;
+}
+
+$allowed = false;
+if ((int)$tx['id_users'] === $token_user_id) {
+  $allowed = true; // buyer
+} else {
+  // check gerai owner
+  $idGerai = isset($tx['id_gerai']) ? (int)$tx['id_gerai'] : 0;
+  $geraiOwnerId = 0;
+  if ($idGerai > 0) {
+    $resG = $mysqli->query("SELECT id_users FROM gerai WHERE id_gerai = " . $idGerai . " LIMIT 1");
+    if ($resG && $resG->num_rows > 0) {
+      $g = $resG->fetch_assoc();
+      $resG->free();
+      $geraiOwnerId = (int)$g['id_users'];
+      if ($geraiOwnerId === $token_user_id) {
+        $allowed = true; // seller (gerai owner)
+      }
+    }
+  }
+}
+
+if (!$allowed) {
   http_response_code(403);
-  echo json_encode(['success'=>false,'message'=>'Access denied']);
+  // Include minimal debug details to help local diagnosis (safe for dev environment)
+  echo json_encode([
+    'success' => false,
+    'message' => 'Access denied',
+    'debug' => [
+      'token_user_id' => $token_user_id,
+      'transaction_user_id' => isset($tx['id_users']) ? (int)$tx['id_users'] : 0,
+      'gerai_owner_id' => isset($geraiOwnerId) ? $geraiOwnerId : 0,
+      'id_gerai' => isset($tx['id_gerai']) ? (int)$tx['id_gerai'] : 0,
+    ]
+  ]);
   exit;
 }
 

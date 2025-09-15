@@ -5,7 +5,7 @@ header('Access-Control-Allow-Methods: GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Accept, Authorization');
 if($_SERVER['REQUEST_METHOD']==='OPTIONS'){http_response_code(204);exit;}
 
-require_once __DIR__ . '/protected.php';
+require_once __DIR__.'/protected.php';
 require 'db.php';
 
 $id_gerai = isset($_GET['id_gerai']) ? (int)$_GET['id_gerai'] : 0;
@@ -14,7 +14,7 @@ if ($id_gerai <= 0) {
     exit;
 }
 
-$sql = "SELECT id_addon, id_gerai, nama_addon, harga, image_path, tersedia FROM addon WHERE id_gerai = ?";
+$sql = "SELECT id_addon, id_gerai, nama_addon, harga, image_path, tersedia, stok FROM addon WHERE id_gerai = ?";
 $stmt = $conn->prepare($sql);
 if(!$stmt){ echo json_encode(["success"=>false,"message"=>"prepare failed"]); exit; }
 $stmt->bind_param("i", $id_gerai);
