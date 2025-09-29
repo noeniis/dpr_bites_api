@@ -117,7 +117,7 @@ try {
     // --------- Rekap Menu Utama ----------
     $menu_rekap = [];
     $sqlMenu = "
-        SELECT m.id_menu, m.nama_menu, SUM(ti.jumlah) as total_terjual
+        SELECT m.id_menu, m.nama_menu, COALESCE(m.harga,0) AS harga_satuan, SUM(ti.jumlah) as total_terjual, SUM(ti.subtotal) as total_pendapatan
         FROM transaksi_item ti
         JOIN menu m ON ti.id_menu = m.id_menu
         JOIN transaksi t ON ti.id_transaksi = t.id_transaksi
@@ -140,7 +140,9 @@ try {
         $menu_rekap[] = [
             'id_menu' => $row['id_menu'],
             'nama_menu' => $row['nama_menu'],
+            'harga_satuan' => isset($row['harga_satuan']) ? (int)$row['harga_satuan'] : 0,
             'total_terjual' => (int)$row['total_terjual'],
+            'total_pendapatan' => isset($row['total_pendapatan']) ? (int)$row['total_pendapatan'] : 0,
         ];
     }
     $stmtMenu->close();
@@ -148,7 +150,7 @@ try {
     // --------- Rekap Add-on ----------
     $addon_rekap = [];
     $sqlAddon = "
-        SELECT a.id_addon, a.nama_addon, COUNT(*) as total_terjual
+        SELECT a.id_addon, a.nama_addon, COALESCE(a.harga,0) AS harga, COUNT(*) as total_terjual, SUM(a.harga) as total_pendapatan
         FROM transaksi_item_addon tia
         JOIN addon a ON tia.id_addon = a.id_addon
         JOIN transaksi_item ti ON tia.id_transaksi_item = ti.id_transaksi_item
@@ -172,7 +174,9 @@ try {
         $addon_rekap[] = [
             'id_addon' => $row['id_addon'],
             'nama_addon' => $row['nama_addon'],
+            'harga' => isset($row['harga']) ? (int)$row['harga'] : 0,
             'total_terjual' => (int)$row['total_terjual'],
+            'total_pendapatan' => isset($row['total_pendapatan']) ? (int)$row['total_pendapatan'] : 0,
         ];
     }
     $stmtAddon->close();
